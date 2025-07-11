@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Admin Dashboard - Precious Gems Store</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+  <div class="container">
+    <header class="header">
+      <div class="logo">💼 Admin Dashboard</div>
+      <div class="nav-buttons">
+        <button class="btn btn-primary" id="logoutBtn">Logout</button>
+      </div>
+    </header>
+
+    <div class="store-section">
+      <h2>Pending Purchases</h2>
+      <button class="btn btn-secondary" id="refreshPurchasesBtn">Refresh</button>
+      <div id="pendingPurchases"></div>
+    </div>
+
+    <div class="store-section">
+      <h2>Withdrawal Requests</h2>
+      <button class="btn btn-secondary" id="refreshWithdrawalsBtn">Refresh</button>
+      <div id="withdrawals"></div>
+    </div>
+
+    <div class="store-section">
+      <h2>Manage Users</h2>
+      <button class="btn btn-secondary" id="refreshUsersBtn">Refresh Users</button>
+      <div id="usersList" style="margin-top:1rem;"></div>
+  </div>
+
+  </div>
+
+  <!-- External JS file -->
+  <script src="/js/admin.js" defer></script>
+</body>
+</html>
