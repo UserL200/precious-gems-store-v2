@@ -24,3 +24,6 @@ coverage/
 # Temporary folders
 tmp/
 temp/
+node_modules
+.env.local
+package.json.backup

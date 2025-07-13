@@ -91,3 +91,6 @@ db.sequelize.authenticate()
   .catch(err => {
     console.error('💥 Startup error:', err);
   });
+
+// Export app for Vercel
+module.exports = app;
