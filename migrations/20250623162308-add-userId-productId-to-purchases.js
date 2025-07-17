@@ -2,33 +2,43 @@
 
 /** @type {import('sequelize-cli').Migration} */
 module.exports = {
-  async up (queryInterface, Sequelize) {
-    module.exports = {
   up: async (queryInterface, Sequelize) => {
-    await queryInterface.addColumn('Purchases', 'userId', {
-      type: Sequelize.INTEGER,
-      allowNull: false,
-    });
-    await queryInterface.addColumn('Purchases', 'productId', {
-      type: Sequelize.INTEGER,
-      allowNull: false,
-    });
+    const table = await queryInterface.describeTable('Purchases');
+
+    if (!table.userId) {
+      await queryInterface.addColumn('Purchases', 'userId', {
+        type: Sequelize.INTEGER,
+        allowNull: false,
+        references: {
+          model: 'Users',
+          key: 'id'
+        },
+        onDelete: 'SET NULL',
+        onUpdate: 'CASCADE'
+      });
+    }
+
+    if (!table.productId) {
+      await queryInterface.addColumn('Purchases', 'productId', {
+        type: Sequelize.INTEGER,
+        allowNull: false,
+        references: {
+          model: 'Products',
+          key: 'id'
+        },
+        onDelete: 'SET NULL',
+        onUpdate: 'CASCADE'
+      });
+    }
   },
 
   down: async (queryInterface, Sequelize) => {
-    await queryInterface.removeColumn('Purchases', 'userId');
-    await queryInterface.removeColumn('Purchases', 'productId');
-  }
-};
+    const table = await queryInterface.describeTable('Purchases');
 
-  },
+    if (table.userId) {
+      await queryInterface.removeColumn('Purchases', 'userId');
+    }
 
-  async down (queryInterface, Sequelize) {
-    /**
-     * Add reverting commands here.
-     *
-     * Example:
-     * await queryInterface.dropTable('users');
-     */
-  }
-};
+    if (table.productId) {
+      await queryInterface.removeColumn('Purchases', 'productId');
+    }}}

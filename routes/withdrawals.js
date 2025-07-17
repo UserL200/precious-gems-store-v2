@@ -2,133 +2,77 @@ const express = require('express');
 const router = express.Router();
 const { User, Withdrawal } = require('../models');
 const BalanceService = require('../services/balanceService');
+const { verifyToken } = require('./auth'); // ✅ JWT middleware
+
+// 🔒 User Routes (Require JWT)
 
 // GET /api/withdrawals/balance - Get user's current balance
-router.get('/balance', async (req, res) => {
+router.get('/balance', verifyToken, async (req, res) => {
   try {
-    // Authentication check
-    if (!req.session || !req.session.userId) {
-      return res.status(401).json({ error: 'Unauthorized' });
-    }
-    
-    console.log('🔍 Getting balance for user:', req.session.userId);
-    
-    // Use the centralized balance service
-    const balance = await BalanceService.calculateUserBalance(req.session.userId);
-    
-    console.log('📊 Balance calculated:', balance);
-    
+    const balance = await BalanceService.calculateUserBalance(req.user.id);
+
     res.json({
-      // Main balance (what user can withdraw)
       balance: balance.availableBalance,
-      
-      // Detailed breakdown
       commissionSum: balance.commissionSum,
       appreciationSum: balance.appreciationSum,
       grossTotal: balance.grossTotal,
-      
-      // Withdrawal tracking
       totalApprovedWithdrawals: balance.totalApprovedWithdrawals,
       totalPendingWithdrawals: balance.totalPendingWithdrawals,
-      
-      // Available vs pending balance
       availableBalance: balance.availableBalance,
       pendingBalance: balance.pendingBalance,
-      
-      // Status info
       hasPendingWithdrawals: balance.totalPendingWithdrawals > 0
     });
-
   } catch (error) {
     console.error('💥 Balance fetch error:', error);
-    res.status(500).json({ 
-      error: 'Failed to fetch balance',
-      details: process.env.NODE_ENV === 'development' ? error.message : undefined
-    });
+    res.status(500).json({ error: 'Failed to fetch balance' });
   }
 });
 
 // POST /api/withdrawals - Request withdrawal
-router.post('/', async (req, res) => {
+router.post('/', verifyToken, async (req, res) => {
   try {
-    // Authentication check
-    if (!req.session || !req.session.userId) {
-      return res.status(401).json({ error: 'Unauthorized' });
-    }
-    
-    console.log('🔍 Withdrawal request received:', {
-      userId: req.session.userId,
-      body: req.body
-    });
-    
-    // Validate request data
     const { amount, bankName, accountNumber, forfeitPurchaseId } = req.body;
-    
+
     if (!amount || !bankName || !accountNumber) {
-      return res.status(400).json({ 
-        error: 'Missing required fields: amount, bankName, accountNumber' 
-      });
+      return res.status(400).json({ error: 'Missing required fields: amount, bankName, accountNumber' });
     }
-    
+
     if (isNaN(amount) || amount <= 0) {
-      return res.status(400).json({ 
-        error: 'Invalid amount: must be a positive number' 
-      });
+      return res.status(400).json({ error: 'Invalid amount: must be a positive number' });
     }
-    
-    // Process withdrawal using the centralized service
-    const result = await BalanceService.processWithdrawalRequest(req.session.userId, {
+
+    const result = await BalanceService.processWithdrawalRequest(req.user.id, {
       amount: parseFloat(amount),
       bankName: bankName.trim(),
       accountNumber: accountNumber.trim(),
       forfeitPurchaseId: forfeitPurchaseId || null
     });
-    
-    console.log('✅ Withdrawal request processed:', result);
-    
+
     res.json({
       success: true,
       message: result.message,
       withdrawal: result.withdrawal
     });
-    
   } catch (error) {
     console.error('💥 Withdrawal request error:', error);
-    
-    // Return user-friendly error messages
+
     let errorMessage = 'Failed to process withdrawal request';
-    if (error.message.includes('Insufficient balance')) {
-      errorMessage = error.message;
-    } else if (error.message.includes('Invalid purchase')) {
-      errorMessage = error.message;
-    } else if (error.message.includes('Missing required')) {
-      errorMessage = error.message;
-    }
-    
-    res.status(400).json({ 
-      error: errorMessage,
-      details: process.env.NODE_ENV === 'development' ? error.message : undefined
-    });
+    if (error.message.includes('Insufficient balance')) errorMessage = error.message;
+    if (error.message.includes('Invalid purchase')) errorMessage = error.message;
+    if (error.message.includes('Missing required')) errorMessage = error.message;
+
+    res.status(400).json({ error: errorMessage });
   }
 });
 
 // GET /api/withdrawals - Get user's withdrawal history
-router.get('/', async (req, res) => {
+router.get('/', verifyToken, async (req, res) => {
   try {
-    // Authentication check
-    if (!req.session || !req.session.userId) {
-      return res.status(401).json({ error: 'Unauthorized' });
-    }
-    
-    console.log('🔍 Getting withdrawal history for user:', req.session.userId);
-    
-    // Get user's withdrawals
     const withdrawals = await Withdrawal.findAll({
-      where: { userId: req.session.userId },
+      where: { userId: req.user.id },
       order: [['createdAt', 'DESC']]
     });
-    
-    // Format withdrawal data for response
+
     const formattedWithdrawals = withdrawals.map(w => ({
       id: w.id,
       amount: w.amount,
@@ -141,16 +85,11 @@ router.get('/', async (req, res) => {
       createdAt: w.createdAt,
       processedAt: w.processedAt
     }));
-    
-    // Calculate summary stats
+
     const totalRequested = withdrawals.reduce((sum, w) => sum + w.amount, 0);
-    const totalApproved = withdrawals
-      .filter(w => w.status === 'approved')
-      .reduce((sum, w) => sum + w.amount, 0);
-    const totalPending = withdrawals
-      .filter(w => w.status === 'pending')
-      .reduce((sum, w) => sum + w.amount, 0);
-    
+    const totalApproved = withdrawals.filter(w => w.status === 'approved').reduce((sum, w) => sum + w.amount, 0);
+    const totalPending = withdrawals.filter(w => w.status === 'pending').reduce((sum, w) => sum + w.amount, 0);
+
     res.json({
       withdrawals: formattedWithdrawals,
       summary: {
@@ -163,30 +102,25 @@ router.get('/', async (req, res) => {
         rejectedCount: withdrawals.filter(w => w.status === 'declined').length
       }
     });
-    
   } catch (error) {
     console.error('💥 Withdrawal history error:', error);
-    res.status(500).json({ 
-      error: 'Failed to fetch withdrawal history',
-      details: process.env.NODE_ENV === 'development' ? error.message : undefined
-    });
+    res.status(500).json({ error: 'Failed to fetch withdrawal history' });
   }
 });
 
-// Admin Routes
+// 🔐 Admin Routes
 
 // GET /api/withdrawals/admin - Get all withdrawal requests (admin only)
-// GET /api/withdrawals/admin - Get all withdrawal requests (admin only)
-router.get('/admin', async (req, res) => {
+router.get('/admin', verifyToken, async (req, res) => {
+  // Enhanced admin check with better error message
+  if (!req.user.isAdmin) {
+    return res.status(403).json({ 
+      error: 'Admin access required',
+      message: 'You do not have permission to access this resource'
+    });
+  }
+
   try {
-    // Admin authentication check
-    if (!req.session || !req.session.isAdmin) {
-      return res.status(403).json({ error: 'Admin access required' });
-    }
-    
-    console.log('🔍 Admin getting all withdrawal requests');
-    
-    // Get all withdrawal requests with user info
     const withdrawals = await Withdrawal.findAll({
       include: [{
         model: User,
@@ -194,8 +128,7 @@ router.get('/admin', async (req, res) => {
       }],
       order: [['createdAt', 'DESC']]
     });
-    
-    // Format data for admin view (ADD NULL CHECK HERE)
+
     const formattedWithdrawals = withdrawals.map(w => ({
       id: w.id,
       amount: w.amount,
@@ -207,28 +140,23 @@ router.get('/admin', async (req, res) => {
       adminNote: w.adminNote,
       createdAt: w.createdAt,
       processedAt: w.processedAt,
-      user: w.User ? {  // 🔥 ADD THIS NULL CHECK
+      user: w.User ? {
         id: w.User.id,
         phone: w.User.phone,
         email: w.User.email,
         referralCode: w.User.referralCode
-      } : {  // 🔥 FALLBACK FOR DELETED USERS
+      } : {
         id: null,
         phone: 'User Deleted',
         email: 'User Deleted',
         referralCode: 'N/A'
       }
     }));
-    
-    // Calculate admin summary
+
     const totalRequested = withdrawals.reduce((sum, w) => sum + w.amount, 0);
-    const totalApproved = withdrawals
-      .filter(w => w.status === 'approved')
-      .reduce((sum, w) => sum + w.amount, 0);
-    const totalPending = withdrawals
-      .filter(w => w.status === 'pending')
-      .reduce((sum, w) => sum + w.amount, 0);
-    
+    const totalApproved = withdrawals.filter(w => w.status === 'approved').reduce((sum, w) => sum + w.amount, 0);
+    const totalPending = withdrawals.filter(w => w.status === 'pending').reduce((sum, w) => sum + w.amount, 0);
+
     res.json({
       withdrawals: formattedWithdrawals,
       summary: {
@@ -241,70 +169,52 @@ router.get('/admin', async (req, res) => {
         rejectedCount: withdrawals.filter(w => w.status === 'declined').length
       }
     });
-    
   } catch (error) {
     console.error('💥 Admin withdrawal fetch error:', error);
-    res.status(500).json({ 
-      error: 'Failed to fetch withdrawal requests',
-      details: process.env.NODE_ENV === 'development' ? error.message : undefined
-    });
+    res.status(500).json({ error: 'Failed to fetch withdrawal requests' });
   }
 });
 
 // POST /api/withdrawals/admin/process - Process withdrawal request (admin only)
-router.post('/admin/process', async (req, res) => {
+router.post('/admin/process', verifyToken, async (req, res) => {
+  // Enhanced admin check with better error message
+  if (!req.user.isAdmin) {
+    return res.status(403).json({ 
+      error: 'Admin access required',
+      message: 'You do not have permission to process withdrawal requests'
+    });
+  }
+
   try {
-    // Admin authentication check
-    if (!req.session || !req.session.isAdmin) {
-      return res.status(403).json({ error: 'Admin access required' });
-    }
-    
-    console.log('🔍 Admin processing withdrawal:', req.body);
-    
     const { withdrawalId, status, adminNote } = req.body;
-    
-    // Validate request
+
     if (!withdrawalId || !status) {
-      return res.status(400).json({ 
-        error: 'Missing required fields: withdrawalId, status' 
-      });
+      return res.status(400).json({ error: 'Missing required fields: withdrawalId, status' });
     }
-    
+
     if (!['approved', 'declined'].includes(status)) {
-      return res.status(400).json({ 
-        error: 'Invalid status. Must be approved or declined' 
-      });
+      return res.status(400).json({ error: 'Invalid status. Must be approved or declined' });
     }
-    
-    // Process using the centralized service
+
     const result = await BalanceService.updateWithdrawalStatus(
       withdrawalId, 
       status, 
       adminNote
     );
-    
-    console.log('✅ Withdrawal processed by admin:', result);
-    
+
     res.json({
       success: true,
       message: result.message,
       withdrawal: result.withdrawal
     });
-    
   } catch (error) {
     console.error('💥 Admin withdrawal processing error:', error);
-    
+
     let errorMessage = 'Failed to process withdrawal';
-    if (error.message.includes('not found')) {
-      errorMessage = 'Withdrawal request not found';
-    } else if (error.message.includes('pending')) {
-      errorMessage = 'Can only process pending withdrawal requests';
-    }
-    
-    res.status(400).json({ 
-      error: errorMessage,
-      details: process.env.NODE_ENV === 'development' ? error.message : undefined
-    });
+    if (error.message.includes('not found')) errorMessage = 'Withdrawal request not found';
+    if (error.message.includes('pending')) errorMessage = 'Can only process pending withdrawal requests';
+
+    res.status(400).json({ error: errorMessage });
   }
 });
 

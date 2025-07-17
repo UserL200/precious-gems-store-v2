@@ -1,13 +1,10 @@
 const express = require('express');
 const router = express.Router();
 const { Purchase, Commission, User, Product, sequelize } = require('../models');
+const { verifyToken } = require('./auth'); // Import JWT middleware
 
-// Checkout route
-router.post('/checkout', async (req, res) => {
-  if (!req.session.userId) {
-    return res.status(401).json({ error: 'Unauthorized' });
-  }
-
+// Checkout route - now uses JWT authentication
+router.post('/checkout', verifyToken, async (req, res) => {
   const { items } = req.body;
   if (!Array.isArray(items) || items.length === 0) {
     return res.status(400).json({ error: 'No items' });
@@ -30,12 +27,12 @@ router.post('/checkout', async (req, res) => {
     }
 
     const purchase = await Purchase.create({
-      userId: req.session.userId,
+      userId: req.user.id, // Now using req.user.id from JWT token
       totalAmount: total
     }, { transaction: t });
 
     // Rest of your code stays the same...
-    const buyer = await User.findByPk(req.session.userId, { transaction: t });
+    const buyer = await User.findByPk(req.user.id, { transaction: t });
     if (buyer.referredBy) {
       const commissionAmount = total * 0.20;
       await Commission.create({
@@ -56,4 +53,3 @@ router.post('/checkout', async (req, res) => {
 });
 
 module.exports = router;
-

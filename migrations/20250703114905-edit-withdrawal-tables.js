@@ -2,55 +2,75 @@
 
 module.exports = {
   up: async (queryInterface, Sequelize) => {
-    // Add new columns to Withdrawals table
-    await queryInterface.addColumn('Withdrawals', 'forfeitPurchaseId', {
-      type: Sequelize.INTEGER,
-      allowNull: true,
-      references: {
-        model: 'Purchases',
-        key: 'id'
-      },
-      onUpdate: 'CASCADE',
-      onDelete: 'SET NULL'
-    });
+    const table = await queryInterface.describeTable('Withdrawals');
 
-    await queryInterface.addColumn('Withdrawals', 'forfeitedAmount', {
-      type: Sequelize.DECIMAL(10, 2),
-      allowNull: true,
-      defaultValue: 0.00
-    });
+    if (!table.forfeitPurchaseId) {
+      await queryInterface.addColumn('Withdrawals', 'forfeitPurchaseId', {
+        type: Sequelize.INTEGER,
+        allowNull: true,
+        references: {
+          model: 'Purchases',
+          key: 'id'
+        },
+        onUpdate: 'CASCADE',
+        onDelete: 'SET NULL'
+      });
+    }
 
-    await queryInterface.addColumn('Withdrawals', 'adminNote', {
-      type: Sequelize.TEXT,
-      allowNull: true
-    });
+    if (!table.forfeitedAmount) {
+      await queryInterface.addColumn('Withdrawals', 'forfeitedAmount', {
+        type: Sequelize.DECIMAL(10, 2),
+        allowNull: true,
+        defaultValue: 0.00
+      });
+    }
 
-    await queryInterface.addColumn('Withdrawals', 'processedAt', {
-      type: Sequelize.DATE,
-      allowNull: true
-    });
+    if (!table.adminNote) {
+      await queryInterface.addColumn('Withdrawals', 'adminNote', {
+        type: Sequelize.TEXT,
+        allowNull: true
+      });
+    }
 
-    // Update existing withdrawals to have proper status if needed
+    if (!table.processedAt) {
+      await queryInterface.addColumn('Withdrawals', 'processedAt', {
+        type: Sequelize.DATE,
+        allowNull: true
+      });
+    }
+
+    // Fix null/empty statuses
     await queryInterface.sequelize.query(`
       UPDATE Withdrawals 
       SET status = 'pending' 
       WHERE status IS NULL OR status = ''
     `);
 
-    // Add index for better performance
+    // Add indexes (safe to run without duplication)
     await queryInterface.addIndex('Withdrawals', ['userId', 'status']);
     await queryInterface.addIndex('Withdrawals', ['status', 'createdAt']);
   },
 
   down: async (queryInterface, Sequelize) => {
-    // Remove indexes
+    const table = await queryInterface.describeTable('Withdrawals');
+
     await queryInterface.removeIndex('Withdrawals', ['userId', 'status']);
     await queryInterface.removeIndex('Withdrawals', ['status', 'createdAt']);
 
-    // Remove columns
-    await queryInterface.removeColumn('Withdrawals', 'forfeitPurchaseId');
-    await queryInterface.removeColumn('Withdrawals', 'forfeitedAmount');
-    await queryInterface.removeColumn('Withdrawals', 'adminNote');
-    await queryInterface.removeColumn('Withdrawals', 'processedAt');
+    if (table.forfeitPurchaseId) {
+      await queryInterface.removeColumn('Withdrawals', 'forfeitPurchaseId');
+    }
+
+    if (table.forfeitedAmount) {
+      await queryInterface.removeColumn('Withdrawals', 'forfeitedAmount');
+    }
+
+    if (table.adminNote) {
+      await queryInterface.removeColumn('Withdrawals', 'adminNote');
+    }
+
+    if (table.processedAt) {
+      await queryInterface.removeColumn('Withdrawals', 'processedAt');
+    }
   }
 };

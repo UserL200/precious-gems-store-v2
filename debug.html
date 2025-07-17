@@ -1,0 +1,568 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Auth Debug - Landing Page</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 2rem;
+        }
+
+        .container {
+            background: white;
+            padding: 2rem;
+            border-radius: 10px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+            width: 90%;
+            max-width: 500px;
+            margin: 0 auto;
+        }
+
+        .hidden {
+            display: none !important;
+        }
+
+        .loader {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 1rem;
+        }
+
+        .spinner {
+            width: 40px;
+            height: 40px;
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid #667eea;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .form-group {
+            margin-bottom: 1rem;
+        }
+
+        label {
+            display: block;
+            margin-bottom: 0.5rem;
+            font-weight: 500;
+            color: #333;
+        }
+
+        input {
+            width: 100%;
+            padding: 0.75rem;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            font-size: 1rem;
+        }
+
+        input:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+
+        button {
+            width: 100%;
+            padding: 0.75rem;
+            background: #667eea;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            font-size: 1rem;
+            cursor: pointer;
+            transition: background 0.3s;
+            margin-bottom: 0.5rem;
+        }
+
+        button:hover {
+            background: #5a67d8;
+        }
+
+        button:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+        }
+
+        .error {
+            color: #e53e3e;
+            margin-top: 0.5rem;
+            font-size: 0.875rem;
+        }
+
+        .success {
+            color: #38a169;
+            margin-top: 0.5rem;
+            font-size: 0.875rem;
+        }
+
+        .toggle-link {
+            text-align: center;
+            margin-top: 1rem;
+            color: #667eea;
+            cursor: pointer;
+            text-decoration: underline;
+        }
+
+        .debug-info {
+            background: #f7fafc;
+            padding: 1rem;
+            border-radius: 5px;
+            margin-top: 1rem;
+            font-size: 0.875rem;
+            color: #4a5568;
+            max-height: 300px;
+            overflow-y: auto;
+        }
+
+        .debug-log {
+            background: #1a202c;
+            color: #e2e8f0;
+            padding: 1rem;
+            border-radius: 5px;
+            margin-top: 1rem;
+            font-family: 'Monaco', 'Menlo', monospace;
+            font-size: 0.75rem;
+            max-height: 200px;
+            overflow-y: auto;
+        }
+
+        .status-indicator {
+            display: inline-block;
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            margin-right: 0.5rem;
+        }
+
+        .status-success { background: #38a169; }
+        .status-error { background: #e53e3e; }
+        .status-warning { background: #d69e2e; }
+        .status-info { background: #3182ce; }
+
+        .test-results {
+            background: #f0f9ff;
+            border: 1px solid #0ea5e9;
+            padding: 1rem;
+            border-radius: 5px;
+            margin-top: 1rem;
+        }
+
+        .test-item {
+            margin-bottom: 0.5rem;
+            padding: 0.5rem;
+            border-radius: 3px;
+        }
+
+        .test-pass {
+            background: #dcfce7;
+            color: #166534;
+        }
+
+        .test-fail {
+            background: #fef2f2;
+            color: #991b1b;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <!-- Connection Test Section -->
+        <div id="connectionTest">
+            <h2>🔍 Authentication Debug Tool</h2>
+            <button onclick="runConnectionTests()">Run Connection Tests</button>
+            <div id="testResults" class="test-results hidden"></div>
+        </div>
+
+        <!-- Loading Section -->
+        <div id="loadingSection" class="loader hidden">
+            <div class="spinner"></div>
+            <p>Checking authentication...</p>
+        </div>
+
+        <!-- Authentication Section -->
+        <div id="authSection" class="hidden">
+            <!-- Login Form -->
+            <div id="loginForm">
+                <h2>Login</h2>
+                <form id="loginFormElement">
+                    <div class="form-group">
+                        <label for="loginPhone">Phone Number</label>
+                        <input type="text" id="loginPhone" placeholder="1234567890" value="1234567890" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="loginPassword">Password</label>
+                        <input type="password" id="loginPassword" placeholder="password123" value="password123" required>
+                    </div>
+                    <button type="submit" id="loginBtn">Login</button>
+                    <div id="loginError" class="error"></div>
+                    <div id="loginSuccess" class="success"></div>
+                </form>
+                <div class="toggle-link" onclick="toggleForm('register')">
+                    Don't have an account? Register here
+                </div>
+            </div>
+
+            <!-- Registration Form -->
+            <div id="registerForm" class="hidden">
+                <h2>Register</h2>
+                <form id="registerFormElement">
+                    <div class="form-group">
+                        <label for="registerPhone">Phone Number</label>
+                        <input type="text" id="registerPhone" placeholder="1234567890" value="1234567890" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="registerPassword">Password</label>
+                        <input type="password" id="registerPassword" placeholder="password123" value="password123" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="registerReferralCode">Referral Code</label>
+                        <input type="text" id="registerReferralCode" placeholder="ABC123" value="ABC123" required>
+                    </div>
+                    <button type="submit" id="registerBtn">Register</button>
+                    <div id="registerError" class="error"></div>
+                    <div id="registerSuccess" class="success"></div>
+                </form>
+                <div class="toggle-link" onclick="toggleForm('login')">
+                    Already have an account? Login here
+                </div>
+            </div>
+        </div>
+
+        <!-- Dashboard Section -->
+        <div id="dashboardSection" class="hidden">
+            <h2>Welcome!</h2>
+            <div id="userInfo"></div>
+            <button onclick="logout()">Logout</button>
+        </div>
+
+        <!-- Debug Information -->
+        <div class="debug-info">
+            <strong>Debug Info:</strong>
+            <div id="debugInfo">Ready to debug...</div>
+        </div>
+
+        <!-- Debug Log -->
+        <div class="debug-log">
+            <strong>Request/Response Log:</strong>
+            <div id="debugLog"></div>
+        </div>
+    </div>
+
+    <script>
+        // Configuration - CHANGE THESE TO MATCH YOUR SETUP
+        const API_BASE_URL = 'http://localhost:3000/api/auth'; // Change port if different
+        const FRONTEND_URL = 'http://localhost:3000'; // Your frontend URL
+
+        // Debug logging
+        let debugLog = [];
+        
+        function log(message, type = 'info') {
+            const timestamp = new Date().toISOString();
+            const logEntry = `[${timestamp}] ${type.toUpperCase()}: ${message}`;
+            debugLog.push(logEntry);
+            
+            const debugElement = document.getElementById('debugLog');
+            debugElement.innerHTML = debugLog.slice(-20).join('\n'); // Keep last 20 logs
+            debugElement.scrollTop = debugElement.scrollHeight;
+            
+            console.log(logEntry);
+        }
+
+        function updateDebugInfo(message) {
+            document.getElementById('debugInfo').innerHTML = message;
+        }
+
+        // Connection Tests
+        async function runConnectionTests() {
+            const resultsDiv = document.getElementById('testResults');
+            resultsDiv.classList.remove('hidden');
+            resultsDiv.innerHTML = '<p>Running tests...</p>';
+            
+            const tests = [];
+            
+            // Test 1: Basic server connection
+            try {
+                const response = await fetch(`${API_BASE_URL}/test`, {
+                    method: 'GET',
+                    credentials: 'include'
+                });
+                tests.push({
+                    name: 'Server Connection',
+                    pass: true,
+                    message: `Server responding (${response.status})`
+                });
+            } catch (error) {
+                tests.push({
+                    name: 'Server Connection',
+                    pass: false,
+                    message: `Server unreachable: ${error.message}`
+                });
+            }
+            
+            // Test 2: Auth endpoints exist
+            const endpoints = ['/register', '/login', '/me', '/logout'];
+            for (const endpoint of endpoints) {
+                try {
+                    const response = await fetch(`${API_BASE_URL}${endpoint}`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({}),
+                        credentials: 'include'
+                    });
+                    tests.push({
+                        name: `Endpoint ${endpoint}`,
+                        pass: response.status !== 404,
+                        message: `Status: ${response.status}`
+                    });
+                } catch (error) {
+                    tests.push({
+                        name: `Endpoint ${endpoint}`,
+                        pass: false,
+                        message: `Error: ${error.message}`
+                    });
+                }
+            }
+            
+            // Test 3: CORS check
+            try {
+                const response = await fetch(`${API_BASE_URL}/login`, {
+                    method: 'OPTIONS',
+                    credentials: 'include'
+                });
+                const corsHeaders = response.headers.get('Access-Control-Allow-Origin');
+                tests.push({
+                    name: 'CORS Configuration',
+                    pass: corsHeaders !== null,
+                    message: `CORS headers: ${corsHeaders || 'Not found'}`
+                });
+            } catch (error) {
+                tests.push({
+                    name: 'CORS Configuration',
+                    pass: false,
+                    message: `CORS error: ${error.message}`
+                });
+            }
+            
+            // Display results
+            const html = tests.map(test => `
+                <div class="test-item ${test.pass ? 'test-pass' : 'test-fail'}">
+                    <span class="status-indicator ${test.pass ? 'status-success' : 'status-error'}"></span>
+                    <strong>${test.name}:</strong> ${test.message}
+                </div>
+            `).join('');
+            
+            resultsDiv.innerHTML = html;
+            
+            // Show auth section if basic tests pass
+            if (tests[0].pass) {
+                document.getElementById('authSection').classList.remove('hidden');
+            }
+        }
+
+        // Form handling
+        function toggleForm(formType) {
+            const loginForm = document.getElementById('loginForm');
+            const registerForm = document.getElementById('registerForm');
+            
+            if (formType === 'login') {
+                loginForm.classList.remove('hidden');
+                registerForm.classList.add('hidden');
+            } else {
+                loginForm.classList.add('hidden');
+                registerForm.classList.remove('hidden');
+            }
+        }
+
+        // Enhanced API request function
+        async function makeRequest(endpoint, data, method = 'POST') {
+            const url = `${API_BASE_URL}${endpoint}`;
+            log(`Making ${method} request to: ${url}`);
+            log(`Request data: ${JSON.stringify(data)}`);
+            
+            try {
+                const response = await fetch(url, {
+                    method,
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Accept': 'application/json'
+                    },
+                    credentials: 'include',
+                    body: method !== 'GET' ? JSON.stringify(data) : undefined
+                });
+                
+                log(`Response status: ${response.status} ${response.statusText}`);
+                
+                const responseText = await response.text();
+                log(`Response text: ${responseText}`);
+                
+                let responseData;
+                try {
+                    responseData = JSON.parse(responseText);
+                } catch (e) {
+                    log(`Failed to parse JSON: ${e.message}`);
+                    responseData = { error: 'Invalid JSON response', raw: responseText };
+                }
+                
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}: ${responseData.error || responseData.message || 'Unknown error'}`);
+                }
+                
+                return responseData;
+            } catch (error) {
+                log(`Request failed: ${error.message}`, 'error');
+                throw error;
+            }
+        }
+
+        // Registration
+        document.getElementById('registerFormElement').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            const phone = document.getElementById('registerPhone').value;
+            const password = document.getElementById('registerPassword').value;
+            const referralCode = document.getElementById('registerReferralCode').value;
+            
+            const errorDiv = document.getElementById('registerError');
+            const successDiv = document.getElementById('registerSuccess');
+            const submitBtn = document.getElementById('registerBtn');
+            
+            errorDiv.textContent = '';
+            successDiv.textContent = '';
+            submitBtn.disabled = true;
+            submitBtn.textContent = 'Registering...';
+            
+            try {
+                const data = await makeRequest('/register', {
+                    phone,
+                    password,
+                    referralCode
+                });
+                
+                log('Registration successful', 'success');
+                successDiv.textContent = 'Registration successful! You can now login.';
+                
+                // Auto-switch to login form
+                setTimeout(() => {
+                    toggleForm('login');
+                    document.getElementById('loginPhone').value = phone;
+                    document.getElementById('loginPassword').value = password;
+                }, 2000);
+                
+            } catch (error) {
+                log(`Registration failed: ${error.message}`, 'error');
+                errorDiv.textContent = error.message;
+            } finally {
+                submitBtn.disabled = false;
+                submitBtn.textContent = 'Register';
+            }
+        });
+
+        // Login
+        document.getElementById('loginFormElement').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            const phone = document.getElementById('loginPhone').value;
+            const password = document.getElementById('loginPassword').value;
+            
+            const errorDiv = document.getElementById('loginError');
+            const successDiv = document.getElementById('loginSuccess');
+            const submitBtn = document.getElementById('loginBtn');
+            
+            errorDiv.textContent = '';
+            successDiv.textContent = '';
+            submitBtn.disabled = true;
+            submitBtn.textContent = 'Logging in...';
+            
+            try {
+                const data = await makeRequest('/login', {
+                    phone,
+                    password
+                });
+                
+                log('Login successful', 'success');
+                successDiv.textContent = 'Login successful!';
+                
+                // Show dashboard
+                showDashboard(data.user);
+                
+            } catch (error) {
+                log(`Login failed: ${error.message}`, 'error');
+                errorDiv.textContent = error.message;
+            } finally {
+                submitBtn.disabled = false;
+                submitBtn.textContent = 'Login';
+            }
+        });
+
+        // Show dashboard
+        function showDashboard(user) {
+            document.getElementById('authSection').classList.add('hidden');
+            document.getElementById('dashboardSection').classList.remove('hidden');
+            
+            document.getElementById('userInfo').innerHTML = `
+                <p><strong>Phone:</strong> ${user.phone}</p>
+                <p><strong>Referral Code:</strong> ${user.referralCode}</p>
+                <p><strong>Admin:</strong> ${user.isAdmin ? 'Yes' : 'No'}</p>
+                <p><strong>Total Received:</strong> ${user.totalReceived || 0}</p>
+            `;
+        }
+
+        // Logout
+        async function logout() {
+            try {
+                await makeRequest('/logout', {});
+                log('Logout successful', 'success');
+                
+                // Reset UI
+                document.getElementById('dashboardSection').classList.add('hidden');
+                document.getElementById('authSection').classList.remove('hidden');
+                toggleForm('login');
+                
+                // Clear forms
+                document.getElementById('loginFormElement').reset();
+                document.getElementById('registerFormElement').reset();
+                
+            } catch (error) {
+                log(`Logout failed: ${error.message}`, 'error');
+            }
+        }
+
+        // Check authentication on page load
+        async function checkAuth() {
+            updateDebugInfo('Checking authentication...');
+            
+            try {
+                const data = await makeRequest('/me', {}, 'GET');
+                log('User is authenticated', 'success');
+                showDashboard(data.user);
+            } catch (error) {
+                log('User is not authenticated', 'info');
+                updateDebugInfo('User not authenticated - showing login form');
+                document.getElementById('authSection').classList.remove('hidden');
+            }
+        }
+
+        // Initialize
+        document.addEventListener('DOMContentLoaded', () => {
+            log('Page loaded - Debug tool ready');
+            updateDebugInfo('Debug tool loaded. Click "Run Connection Tests" to start.');
+        });
+    </script>
+</body>
+</html>
