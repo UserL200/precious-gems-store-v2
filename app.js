@@ -46,8 +46,10 @@ app.use(session({
   resave: false,
   saveUninitialized: false,
   cookie: { 
+    domain: 'https://precious-gems-store-v4.vercel.app/',
     httpOnly: true, 
-    secure: process.env.NODE_ENV === 'production', // set to true in production with HTTPS
+    secure: true,
+    sameSite: 'none', 
     maxAge: 24 * 60 * 60 * 1000 // 24 hours
   }
 }));
