@@ -94,7 +94,6 @@ app.use('*', (req, res) => {
 
 // Global error handler
 app.use((err, req, res, next) => {
-  console.error('💥 Global error:', err);
   res.status(500).json({ 
     error: 'Internal server error',
     details: process.env.NODE_ENV === 'development' ? err.message : undefined
@@ -106,43 +105,35 @@ const startServer = async () => {
   try {
     // Test database connection
     await db.sequelize.authenticate();
-    console.log('✅ Database connected successfully');
 
     // Sync models (create tables if they don't exist)
     // await sequelize.sync({ alter: true }); // Uncomment for development
-    console.log('✅ Models synced');
+    
 
     // Seed admin user
     await seedAdminUser(db);
-    console.log('✅ Admin user seeded');
+    
 
     // Seed products
     await seedProducts();
-    console.log('✅ Products seeded');
 
     // Start server
     const PORT = process.env.PORT || 3000;
     app.listen(PORT, () => {
-      console.log(`🚀 Server running on port ${PORT}`);
-      console.log(`🔐 Authentication: JWT-based (stateless)`);
-      console.log(`🌐 Environment: ${process.env.NODE_ENV || 'development'}`);
     });
 
   } catch (error) {
-    console.error('💥 Startup error:', error);
     process.exit(1);
   }
 };
 
 // Handle graceful shutdown
 process.on('SIGINT', async () => {
-  console.log('👋 Shutting down gracefully...');
   await db.sequelize.close();
   process.exit(0);
 });
 
 process.on('SIGTERM', async () => {
-  console.log('👋 Shutting down gracefully...');
   await db.sequelize.close();
   process.exit(0);
 });

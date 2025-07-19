@@ -2,7 +2,6 @@
 function checkAuthentication() {
   const token = localStorage.getItem('token');
   if (!token) {
-    console.log('No token found, redirecting to login');
     window.location.href = '/';
     return false;
   }
@@ -21,7 +20,6 @@ function checkAdminAccess() {
     
     // Check if token is expired
     if (payload.exp && Date.now() >= payload.exp * 1000) {
-      console.log('Token expired, redirecting to login');
       localStorage.removeItem('token');
       window.location.href = '/';
       return false;
@@ -29,13 +27,11 @@ function checkAdminAccess() {
     
     // Check if user is admin
     if (!payload.isAdmin) {
-      console.log('User is not admin, access denied');
       return false;
     }
     
     return true;
   } catch (error) {
-    console.error('Error decoding token:', error);
     localStorage.removeItem('token');
     window.location.href = '/';
     return false;
@@ -58,7 +54,6 @@ function showAccessDenied() {
 async function makeAuthenticatedRequest(url, options = {}) {
   const token = localStorage.getItem('token');
   if (!token) {
-    console.warn('No token found in localStorage');
     window.location.href = '/';
     return;
   }
@@ -75,12 +70,10 @@ async function makeAuthenticatedRequest(url, options = {}) {
     credentials: 'include'
   };
 
-  console.log('Making authenticated request to:', url);
 
   const response = await fetch(url, requestOptions);
   
   if (response.status === 401) {
-    console.error('Authentication failed, redirecting to login');
     localStorage.removeItem('token');
     window.location.href = '/';
     return;
@@ -97,7 +90,6 @@ const paginationState = {
 };
 
 document.addEventListener('DOMContentLoaded', () => {
-  console.log('🔍 Admin page loaded, checking authentication...');
   
   // Check if user is authenticated and is admin
   if (!checkAuthentication() || !checkAdminAccess()) {
@@ -105,7 +97,6 @@ document.addEventListener('DOMContentLoaded', () => {
     return;
   }
   
-  console.log('✅ Admin access granted, showing admin content');
   
   const logoutBtn = document.getElementById('logoutBtn');
   if (logoutBtn) logoutBtn.addEventListener('click', logout);
@@ -123,7 +114,6 @@ document.addEventListener('DOMContentLoaded', () => {
   setupEventDelegation();
 
   // Load initial data
-  console.log('🔄 Loading initial data...');
   loadWithdrawals(1);
   loadUsers(1);
   loadPendingPurchases(1);
@@ -205,7 +195,6 @@ async function logout() {
     localStorage.removeItem('token');
     window.location.href = '/';
   } catch (error) {
-    console.error('Logout error:', error);
     window.location.href = '/';
   }
 }
@@ -340,7 +329,6 @@ async function loadWithdrawals(page = 1) {
     container.innerHTML = tableHTML;
 
   } catch (error) {
-    console.error('Error loading withdrawals:', error);
     container.innerHTML = `
       <div class="error-message" style="color: red; padding: 1rem; border: 1px solid red; border-radius: 4px; margin: 1rem 0;">
         <h4>Error Loading Withdrawals</h4>
@@ -353,7 +341,6 @@ async function loadWithdrawals(page = 1) {
 
 async function processWithdrawal(id, status) {
   if (!id) {
-    console.error('No withdrawal ID provided');
     return;
   }
 
@@ -369,7 +356,6 @@ async function processWithdrawal(id, status) {
 
     await loadWithdrawals(paginationState.withdrawals.currentPage);
   } catch (error) {
-    console.error('Error processing withdrawal:', error);
     alert(`Error processing withdrawal: ${error.message}`);
   }
 }
@@ -452,7 +438,6 @@ async function loadPendingPurchases(page = 1) {
     container.innerHTML = tableHTML;
 
   } catch (error) {
-    console.error('Error loading pending purchases:', error);
     container.innerHTML = `
       <div class="error-message" style="color: red; padding: 1rem; border: 1px solid red; border-radius: 4px; margin: 1rem 0;">
         <h4>Error Loading Pending Purchases</h4>
@@ -465,7 +450,6 @@ async function loadPendingPurchases(page = 1) {
 
 async function processPurchase(id, status) {
   if (!id) {
-    console.error('No purchase ID provided');
     return;
   }
 
@@ -481,7 +465,6 @@ async function processPurchase(id, status) {
 
     await loadPendingPurchases(paginationState.purchases.currentPage);
   } catch (error) {
-    console.error('Error processing purchase:', error);
     alert(`Error processing purchase: ${error.message}`);
   }
 }
@@ -562,7 +545,6 @@ async function loadUsers(page = 1) {
     container.innerHTML = tableHTML;
 
   } catch (error) {
-    console.error('Error loading users:', error);
     container.innerHTML = `
       <div class="error-message" style="color: red; padding: 1rem; border: 1px solid red; border-radius: 4px; margin: 1rem 0;">
         <h4>Error Loading Users</h4>
@@ -575,7 +557,6 @@ async function loadUsers(page = 1) {
 
 async function updateRole(userId, isAdmin) {
   if (!userId) {
-    console.error('No user ID provided');
     return;
   }
 
@@ -591,14 +572,12 @@ async function updateRole(userId, isAdmin) {
 
     await loadUsers(paginationState.users.currentPage);
   } catch (error) {
-    console.error('Error updating user role:', error);
     alert(`Error updating user role: ${error.message}`);
   }
 }
 
 async function deleteUser(userId) {
   if (!userId) {
-    console.error('No user ID provided');
     return;
   }
 
@@ -617,7 +596,6 @@ async function deleteUser(userId) {
 
     await loadUsers(paginationState.users.currentPage);
   } catch (error) {
-    console.error('Error deleting user:', error);
     alert(`Error deleting user: ${error.message}`);
   }
 }

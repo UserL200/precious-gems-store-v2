@@ -23,7 +23,6 @@ exports.getWithdrawalBalance = async (req, res) => {
 
     return res.json({ balance: availableBalance > 0 ? availableBalance : 0 });
   } catch (err) {
-    console.error('Get withdrawal balance error:', err);
     return res.status(500).json({ error: 'Server error' });
   }
 };

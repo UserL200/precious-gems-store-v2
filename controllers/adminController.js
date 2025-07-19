@@ -9,7 +9,6 @@ const getAllUsers = async (req, res) => {
     });
     res.json(users);
   } catch (err) {
-    console.error('Get users error:', err);
     res.status(500).json({ error: 'Server error' });
   }
 };
@@ -22,7 +21,6 @@ const getAllPurchases = async (req, res) => {
     });
     res.json(purchases);
   } catch (err) {
-    console.error('Get purchases error:', err);
     res.status(500).json({ error: 'Server error' });
   }
 };
@@ -39,7 +37,6 @@ const getPendingPurchases = async (req, res) => {
     });
     res.json(purchases);
   } catch (err) {
-    console.error('Get pending purchases error:', err);
     res.status(500).json({ error: 'Server error' });
   }
 };
@@ -58,7 +55,6 @@ const processPurchase = async (req, res) => {
     await purchase.save();
     res.json({ message: `Purchase ${status}` });
   } catch (err) {
-    console.error('Process purchase error:', err);
     res.status(500).json({ error: 'Server error' });
   }
 };
@@ -87,7 +83,6 @@ const approvePurchase = async (req, res) => {
     return res.json({ message: `Purchase ${status} successfully` });
 
   } catch (error) {
-    console.error('Purchase process error:', error);
     return res.status(500).json({ error: 'Internal server error' });
   }
 };
@@ -95,11 +90,9 @@ const approvePurchase = async (req, res) => {
 // List all withdrawals - FIXED for NULL users
 const getAllWithdrawals = async (req, res) => {
   try {
-    console.log('🔍 Available db models:', Object.keys(db));
     
     // Check if Withdrawal model exists
     if (!db.Withdrawal) {
-      console.error('❌ Withdrawal model not found in db object');
       return res.status(500).json({ 
         error: 'Withdrawal model not configured',
         availableModels: Object.keys(db)
@@ -115,11 +108,9 @@ const getAllWithdrawals = async (req, res) => {
       order: [['createdAt', 'DESC']]
     });
     
-    console.log('🔍 Found withdrawals:', withdrawals.length);
     
     // Format withdrawal data for admin view - SAFELY handle null users
     const formattedWithdrawals = withdrawals.map(w => {
-      console.log('🔍 Processing withdrawal:', w.id, 'User:', w.User ? w.User.id : 'NULL');
       
       // Safe formatting to handle null users
       const withdrawalData = {
@@ -186,11 +177,9 @@ const getAllWithdrawals = async (req, res) => {
       }
     };
 
-    console.log('✅ Sending withdrawal response with', formattedWithdrawals.length, 'withdrawals');
     res.json(formattedWithdrawals);
     
   } catch (err) {
-    console.error('Get withdrawals error:', err);
     res.status(500).json({ 
       error: 'Server error', 
       details: process.env.NODE_ENV === 'development' ? err.message : 'Internal server error'
@@ -201,7 +190,6 @@ const getAllWithdrawals = async (req, res) => {
 // Process withdrawal using BalanceService (UPDATED)
 const processWithdrawal = async (req, res) => {
   try {
-    console.log('🔍 Admin processing withdrawal:', req.body);
     
     const { withdrawalId, status, adminNote } = req.body;
     
@@ -225,7 +213,6 @@ const processWithdrawal = async (req, res) => {
       adminNote
     );
     
-    console.log('✅ Withdrawal processed by admin:', result);
     
     res.json({
       success: true,
@@ -234,7 +221,6 @@ const processWithdrawal = async (req, res) => {
     });
     
   } catch (error) {
-    console.error('💥 Admin withdrawal processing error:', error);
     
     let errorMessage = 'Failed to process withdrawal';
     if (error.message.includes('not found')) {
@@ -261,7 +247,6 @@ const updateUserRole = async (req, res) => {
     await user.save();
     res.json({ message: `User ${user.phone} role updated` });
   } catch (err) {
-    console.error('Update user role error:', err);
     res.status(500).json({ error: 'Server error' });
   }
 };
@@ -277,7 +262,6 @@ const deactivateUser = async (req, res) => {
     await user.save();
     res.json({ message: `User ${user.phone} deactivated` });
   } catch (err) {
-    console.error('Deactivate user error:', err);
     res.status(500).json({ error: 'Server error' });
   }
 };
@@ -304,7 +288,6 @@ const deleteUser = async (req, res) => {
     await user.destroy();
     res.json({ message: `User ${user.phone} deleted successfully` });
   } catch (err) {
-    console.error('Delete user error:', err);
     res.status(500).json({ error: 'Server error' });
   }
 };

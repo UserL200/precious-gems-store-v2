@@ -3,38 +3,24 @@ const db = require('../models');
 
 const authenticateToken = async (req, res, next) => {
   try {
-    console.log('🔍 Auth middleware - Headers:', {
-      authorization: req.headers.authorization,
-      'content-type': req.headers['content-type'],
-      'user-agent': req.headers['user-agent']?.substring(0, 50) + '...'
-    });
-
     const authHeader = req.headers.authorization;
     const token = authHeader && authHeader.split(' ')[1];
 
     if (!token) {
-      console.log('❌ Auth middleware - No token provided');
       return res.status(401).json({ 
         error: 'Access token required',
         details: 'No authorization header or token found'
       });
     }
 
-    console.log('🔍 Auth middleware - Token extracted: Found');
 
     // Verify the token
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
-    console.log('🔍 Auth middleware - Token decoded:', { 
-      userId: decoded.id || decoded.userId, // Handle both formats
-      phone: decoded.phone, 
-      isAdmin: decoded.isAdmin 
-    });
 
     // Handle both 'id' and 'userId' from token payload
     const userId = decoded.id || decoded.userId;
     
     if (!userId) {
-      console.log('❌ Auth middleware - No user ID in token');
       return res.status(401).json({ 
         error: 'Invalid token',
         details: 'Token missing user ID'
@@ -45,7 +31,6 @@ const authenticateToken = async (req, res, next) => {
     const user = await db.User.findByPk(userId);
     
     if (!user) {
-      console.log('❌ Auth middleware - User not found in database');
       return res.status(401).json({ 
         error: 'Invalid token',
         details: 'User not found'
@@ -59,11 +44,9 @@ const authenticateToken = async (req, res, next) => {
       isAdmin: user.isAdmin
     };
 
-    console.log('✅ Auth middleware - User attached to request:', req.user.id);
     next();
 
   } catch (error) {
-    console.error('❌ Auth middleware - Token verification failed:', error.message);
     
     if (error.name === 'TokenExpiredError') {
       return res.status(401).json({ 
@@ -102,7 +85,6 @@ const requireAdmin = (req, res, next) => {
     });
   }
 
-  console.log('✅ Admin middleware - Admin access granted:', req.user.phone);
   next();
 };
 

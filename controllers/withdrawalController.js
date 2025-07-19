@@ -36,7 +36,6 @@ exports.requestWithdrawal = async (req, res) => {
 
     res.json({ message: 'Withdrawal request submitted successfully' });
   } catch (err) {
-    console.error('Withdrawal error:', err);
     res.status(500).json({ error: 'Server error' });
   }
 };

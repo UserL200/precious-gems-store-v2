@@ -33,7 +33,6 @@ exports.checkout = async (req, res) => {
 
     res.json({ message: 'Purchase completed', purchaseId: purchase.id });
   } catch (err) {
-    console.error('Checkout error:', err);
     res.status(500).json({ error: 'Server error' });
   }
 };

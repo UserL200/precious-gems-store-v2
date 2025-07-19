@@ -40,7 +40,6 @@ exports.getReferralStats = async (req, res) => {
       totalPurchases
     });
   } catch (err) {
-    console.error('Get referral stats error:', err);
     res.status(500).json({ error: 'Server error' });
   }
 };
