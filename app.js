@@ -96,6 +96,7 @@ app.use('*', (req, res) => {
 
 // Global error handler
 app.use((err, req, res, next) => {
+  console.error('Global error handler:', err);
   res.status(500).json({ 
     error: 'Internal server error',
     details: process.env.NODE_ENV === 'development' ? err.message : undefined
@@ -105,38 +106,82 @@ app.use((err, req, res, next) => {
 // Database connection and server startup
 const startServer = async () => {
   try {
+    console.log('Starting server initialization...');
+    
     // Test database connection
+    console.log('Testing database connection...');
     await db.sequelize.authenticate();
+    console.log('Database connection successful');
 
     // Sync models (create tables if they don't exist)
     // await sequelize.sync({ alter: true }); // Uncomment for development
     
-
     // Seed admin user
+    console.log('Seeding admin user...');
     await seedAdminUser(db);
-    
+    console.log('Admin user seeded successfully');
 
     // Seed products
+    console.log('Seeding products...');
     await seedProducts();
+    console.log('Products seeded successfully');
 
     // Start server
     const PORT = process.env.PORT || 3000;
     app.listen(PORT, () => {
+      console.log(`Server running on port ${PORT}`);
     });
 
   } catch (error) {
-    process.exit(1);
+    console.error('❌ Server startup failed:', error.message);
+    console.error('Full error:', error);
+    
+    // In production, we might want to exit, but let's be more graceful
+    if (process.env.NODE_ENV === 'production') {
+      console.error('Exiting due to startup failure in production');
+      process.exit(1);
+    } else {
+      // In development, we can continue without seeding
+      console.log('⚠️  Continuing without complete initialization...');
+      const PORT = process.env.PORT || 3000;
+      app.listen(PORT, () => {
+        console.log(`Server running on port ${PORT} (with startup errors)`);
+      });
+    }
   }
 };
 
+// Handle unhandled promise rejections
+process.on('unhandledRejection', (reason, promise) => {
+  console.error('Unhandled Rejection at:', promise, 'reason:', reason);
+});
+
+// Handle uncaught exceptions
+process.on('uncaughtException', (error) => {
+  console.error('Uncaught Exception:', error);
+  process.exit(1);
+});
+
 // Handle graceful shutdown
 process.on('SIGINT', async () => {
-  await db.sequelize.close();
+  console.log('Received SIGINT, shutting down gracefully...');
+  try {
+    await db.sequelize.close();
+    console.log('Database connection closed');
+  } catch (error) {
+    console.error('Error closing database:', error);
+  }
   process.exit(0);
 });
 
 process.on('SIGTERM', async () => {
-  await db.sequelize.close();
+  console.log('Received SIGTERM, shutting down gracefully...');
+  try {
+    await db.sequelize.close();
+    console.log('Database connection closed');
+  } catch (error) {
+    console.error('Error closing database:', error);
+  }
   process.exit(0);
 });
 
