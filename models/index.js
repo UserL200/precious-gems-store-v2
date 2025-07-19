@@ -1,12 +1,12 @@
-const { Sequelize, DataTypes } = require('sequelize');
-require('dotenv').config();
+require('dotenv').config(); // This must be first!
 
 const { Sequelize, DataTypes } = require('sequelize');
 
-let sequelize;
+// Global variable to store the singleton instance
+global.sequelize = global.sequelize || null;
 
-if (!sequelize) {
-  sequelize = new Sequelize(process.env.DATABASE_URL, {
+if (!global.sequelize) {
+  global.sequelize = new Sequelize(process.env.DATABASE_URL, {
     dialect: 'mysql',
     dialectModule: require('mysql2'),
     logging: false,
@@ -23,6 +23,8 @@ if (!sequelize) {
     }
   });
 }
+
+const sequelize = global.sequelize;
 
 const db = {};
 db.Sequelize = Sequelize;
