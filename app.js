@@ -42,7 +42,12 @@ app.use(helmet({
 app.use(cookieParser());
 app.use(limiter);
 app.use(bodyParser.json());
-app.use(express.static(path.join(__dirname, 'public')));
+// Wrap static file serving with error handling
+app.use(express.static(path.join(__dirname, 'public'), {
+  setHeaders: (res, filePath) => {
+    console.log('📁 Serving static file:', path.basename(filePath));
+  }
+}));
 
 // CORS middleware for JWT tokens
 app.use((req, res, next) => {
@@ -70,12 +75,24 @@ app.use('/api/user', userRoutes);
 
 // Admin page - requires JWT authentication and admin role
 app.get('/admin', (req, res) =>  {
-  res.sendFile(path.join(__dirname, 'public', 'secure', 'admin.html'));
+  try {
+    console.log('🔒 Serving admin page');
+    res.sendFile(path.join(__dirname, 'public', 'secure', 'admin.html'));
+  } catch (error) {
+    console.error('❌ Error serving admin page:', error);
+    res.status(500).json({ error: 'Failed to load admin page' });
+  }
 });
 
 // Home page - public access
 app.get('/', (req, res) => {
-  res.sendFile(path.join(__dirname, 'public', 'index.html'));
+  try {
+    console.log('📄 Serving home page');
+    res.sendFile(path.join(__dirname, 'public', 'index.html'));
+  } catch (error) {
+    console.error('❌ Error serving home page:', error);
+    res.status(500).json({ error: 'Failed to load home page' });
+  }
 });
 
 // Health check endpoint
@@ -96,11 +113,19 @@ app.use('*', (req, res) => {
 
 // Global error handler
 app.use((err, req, res, next) => {
-  console.error('Global error handler:', err);
-  res.status(500).json({ 
-    error: 'Internal server error',
-    details: process.env.NODE_ENV === 'development' ? err.message : undefined
-  });
+  console.error('❌ Global error handler triggered:');
+  console.error('Error message:', err.message);
+  console.error('Error stack:', err.stack);
+  console.error('Request URL:', req.url);
+  console.error('Request method:', req.method);
+  
+  // Prevent the process from crashing
+  if (!res.headersSent) {
+    res.status(500).json({ 
+      error: 'Internal server error',
+      details: process.env.NODE_ENV === 'development' ? err.message : undefined
+    });
+  }
 });
 
 // Database connection and server startup
