@@ -19,7 +19,6 @@ if (!global.sequelize) {
     dialectOptions: {
       connectTimeout: 60000,
       acquireTimeout: 60000,
-      timeout: 60000,
     }
   });
 }

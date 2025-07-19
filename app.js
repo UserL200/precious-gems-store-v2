@@ -87,6 +87,8 @@ app.get('/health', (req, res) => {
   });
 });
 
+app.set('trust proxy', 1);
+
 // 404 handler
 app.use('*', (req, res) => {
   res.status(404).json({ error: 'Route not found' });
