@@ -1,21 +1,36 @@
 const express = require('express');
-const router = express.Router();
+const { authenticateToken,  requireAdmin } = require('../middleware/jwtMiddleware');
 const { Product } = require('../models');
+const router = express.Router();
 
-// Public: get all products
+
 router.get('/', async (req, res) => {
-  const products = await Product.findAll();
-  res.json(products);
+  try {
+    const products = await Product.findAll();
+    res.json(products);
+  } catch (error) {
+    console.error('Get products error:', error);
+    res.status(500).json({ error: 'Server error' });
+  }
 });
 
-// Admin: create product
-router.post('/', async (req, res) => {
-  if (!req.session.userId) return res.status(401).json({ error: 'Unauthorized' });
-  if (!req.session.isAdmin) return res.status(403).json({ error: 'Admins only' });
-
-  const { name, type, price, description, imageUrl } = req.body;
-  const product = await Product.create({ name, type, price, description, imageUrl });
-  res.status(201).json(product);
+// Create product (admin only)
+router.post('/', authenticateToken, requireAdmin, async (req, res) => {
+  try {
+    const { name, price, description, imageUrl } = req.body;
+    
+    const product = await Product.create({
+      nameame, type, price, description, imageUrl
+    });
+    
+    res.status(201).json({
+      message: 'Product created successfully',
+      product
+    });
+  } catch (error) {
+    console.error('Create product error:', error);
+    res.status(500).json({ error: 'Server error' });
+  }
 });
 
 module.exports = router;

@@ -282,12 +282,42 @@ const deactivateUser = async (req, res) => {
   }
 };
 
+const deleteUser = async (req, res) => {
+  try {
+    const { userId } = req.params;
+    const user = await db.User.findByPk(userId);
+    
+    if (!user) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    // Check if user is trying to delete themselves
+    if (user.id === req.user.id) {
+      return res.status(400).json({ error: 'Cannot delete your own account' });
+    }
+
+    // Prevent deletion of other admins (optional security measure)
+    if (user.isAdmin) {
+      return res.status(400).json({ error: 'Cannot delete admin users' });
+    }
+
+    await user.destroy();
+    res.json({ message: `User ${user.phone} deleted successfully` });
+  } catch (err) {
+    console.error('Delete user error:', err);
+    res.status(500).json({ error: 'Server error' });
+  }
+};
+
+
+// Make sure to export the deleteUser function
 module.exports = {
   getAllUsers,
   getAllPurchases,
   getAllWithdrawals,
   updateUserRole,
   deactivateUser,
+  deleteUser,  // Add this export
   processWithdrawal, 
   getPendingPurchases,
   processPurchase,

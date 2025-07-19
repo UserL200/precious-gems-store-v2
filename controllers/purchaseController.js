@@ -2,7 +2,7 @@ const db = require('../models');
 
 exports.checkout = async (req, res) => {
   try {
-    const userId = req.session.userId;
+    const userId = req.user?.id;  
     const { items } = req.body;
 
     if (!items || !items.length) {

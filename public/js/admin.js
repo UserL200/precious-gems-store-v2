@@ -1,3 +1,94 @@
+// Authentication functions (MUST be at the top level)
+function checkAuthentication() {
+  const token = localStorage.getItem('token');
+  if (!token) {
+    console.log('No token found, redirecting to login');
+    window.location.href = '/';
+    return false;
+  }
+  return true;
+}
+
+function checkAdminAccess() {
+  const token = localStorage.getItem('token');
+  if (!token) {
+    return false;
+  }
+  
+  try {
+    // Decode JWT token to check admin status
+    const payload = JSON.parse(atob(token.split('.')[1]));
+    
+    // Check if token is expired
+    if (payload.exp && Date.now() >= payload.exp * 1000) {
+      console.log('Token expired, redirecting to login');
+      localStorage.removeItem('token');
+      window.location.href = '/';
+      return false;
+    }
+    
+    // Check if user is admin
+    if (!payload.isAdmin) {
+      console.log('User is not admin, access denied');
+      return false;
+    }
+    
+    return true;
+  } catch (error) {
+    console.error('Error decoding token:', error);
+    localStorage.removeItem('token');
+    window.location.href = '/';
+    return false;
+  }
+}
+
+function showAccessDenied() {
+  document.body.innerHTML = `
+    <div style="display: flex; justify-content: center; align-items: center; height: 100vh; flex-direction: column; font-family: Arial, sans-serif;">
+      <h1 style="color: #dc3545; margin-bottom: 1rem;">Access Denied</h1>
+      <p style="color: #6c757d; margin-bottom: 2rem;">You don't have permission to access this page.</p>
+      <button onclick="window.location.href='/'" style="padding: 0.5rem 1rem; background-color: #007bff; color: white; border: none; border-radius: 0.25rem; cursor: pointer;">
+        Go to Login
+      </button>
+    </div>
+  `;
+}
+
+// Helper function to make authenticated requests
+async function makeAuthenticatedRequest(url, options = {}) {
+  const token = localStorage.getItem('token');
+  if (!token) {
+    console.warn('No token found in localStorage');
+    window.location.href = '/';
+    return;
+  }
+  
+  const headers = {
+    'Authorization': `Bearer ${token}`,
+    'Content-Type': 'application/json',
+    ...options.headers
+  };
+  
+  const requestOptions = {
+    ...options,
+    headers,
+    credentials: 'include'
+  };
+
+  console.log('Making authenticated request to:', url);
+
+  const response = await fetch(url, requestOptions);
+  
+  if (response.status === 401) {
+    console.error('Authentication failed, redirecting to login');
+    localStorage.removeItem('token');
+    window.location.href = '/';
+    return;
+  }
+  
+  return response;
+}
+
 // Pagination state
 const paginationState = {
   withdrawals: { currentPage: 1, itemsPerPage: 10, totalItems: 0 },
@@ -6,6 +97,16 @@ const paginationState = {
 };
 
 document.addEventListener('DOMContentLoaded', () => {
+  console.log('🔍 Admin page loaded, checking authentication...');
+  
+  // Check if user is authenticated and is admin
+  if (!checkAuthentication() || !checkAdminAccess()) {
+    showAccessDenied();
+    return;
+  }
+  
+  console.log('✅ Admin access granted, showing admin content');
+  
   const logoutBtn = document.getElementById('logoutBtn');
   if (logoutBtn) logoutBtn.addEventListener('click', logout);
 
@@ -22,6 +123,7 @@ document.addEventListener('DOMContentLoaded', () => {
   setupEventDelegation();
 
   // Load initial data
+  console.log('🔄 Loading initial data...');
   loadWithdrawals(1);
   loadUsers(1);
   loadPendingPurchases(1);
@@ -100,11 +202,11 @@ function setupEventDelegation() {
 
 async function logout() {
   try {
-    await fetch('/api/auth/logout', { method: 'POST', credentials: 'include' });
-    location.reload();
+    localStorage.removeItem('token');
+    window.location.href = '/';
   } catch (error) {
     console.error('Logout error:', error);
-    location.reload();
+    window.location.href = '/';
   }
 }
 
@@ -162,33 +264,23 @@ async function loadWithdrawals(page = 1) {
     paginationState.withdrawals.currentPage = page;
     container.innerHTML = '<div class="loading">Loading withdrawals...</div>';
 
-    const res = await fetch('/api/admin/withdrawals', { credentials: 'include' });  
+    const res = await makeAuthenticatedRequest('/api/admin/withdrawals');
     
     if (!res.ok) {
-      if (res.status === 403) {
-        throw new Error('Access denied. Admin privileges required.');
-      } else if (res.status === 401) {
-        throw new Error('Authentication required. Please log in.');
-      } else {
-        throw new Error(`Server error: ${res.status} ${res.statusText}`);
-      }
+      throw new Error(`Server error: ${res.status} ${res.statusText}`);
     }
 
     const responseData = await res.json();
     
-    // Handle the new response format with withdrawals array and summary
     let allData;
     if (Array.isArray(responseData)) {
-      // Backward compatibility - if it's still an array
       allData = responseData;
     } else if (responseData.withdrawals && Array.isArray(responseData.withdrawals)) {
-      // New format with withdrawals property
       allData = responseData.withdrawals;
     } else {
       throw new Error('Invalid data format received from server');
     }
 
-    // Pagination logic
     const itemsPerPage = paginationState.withdrawals.itemsPerPage;
     const totalItems = allData.length;
     const totalPages = Math.ceil(totalItems / itemsPerPage);
@@ -266,10 +358,8 @@ async function processWithdrawal(id, status) {
   }
 
   try {
-    const res = await fetch('/api/withdrawals/admin/process', {
+    const res = await makeAuthenticatedRequest('/api/admin/withdrawals/process', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      credentials: 'include',
       body: JSON.stringify({ withdrawalId: id, status })
     });
 
@@ -292,16 +382,11 @@ async function loadPendingPurchases(page = 1) {
     paginationState.purchases.currentPage = page;
     container.innerHTML = '<div class="loading">Loading pending purchases...</div>';
 
-    const res = await fetch('/api/admin/purchases/pending', { credentials: 'include' });
+    // USE makeAuthenticatedRequest instead of plain fetch
+    const res = await makeAuthenticatedRequest('/api/admin/purchases/pending');
     
     if (!res.ok) {
-      if (res.status === 403) {
-        throw new Error('Access denied. Admin privileges required.');
-      } else if (res.status === 401) {
-        throw new Error('Authentication required. Please log in.');
-      } else {
-        throw new Error(`Server error: ${res.status} ${res.statusText}`);
-      }
+      throw new Error(`Server error: ${res.status} ${res.statusText}`);
     }
 
     const allData = await res.json();
@@ -310,7 +395,6 @@ async function loadPendingPurchases(page = 1) {
       throw new Error('Invalid data format received from server');
     }
 
-    // Pagination logic
     const itemsPerPage = paginationState.purchases.itemsPerPage;
     const totalItems = allData.length;
     const totalPages = Math.ceil(totalItems / itemsPerPage);
@@ -386,10 +470,8 @@ async function processPurchase(id, status) {
   }
 
   try {
-    const res = await fetch(`/api/admin/purchases/${id}/process`, {
+    const res = await makeAuthenticatedRequest(`/api/admin/purchases/${id}/process`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      credentials: 'include',
       body: JSON.stringify({ status })
     });
 
@@ -412,16 +494,11 @@ async function loadUsers(page = 1) {
     paginationState.users.currentPage = page;
     container.innerHTML = '<div class="loading">Loading users...</div>';
 
-    const res = await fetch('/api/admin/users', { credentials: 'include' });
+    // USE makeAuthenticatedRequest instead of plain fetch
+    const res = await makeAuthenticatedRequest('/api/admin/users');
     
     if (!res.ok) {
-      if (res.status === 403) {
-        throw new Error('Access denied. Admin privileges required.');
-      } else if (res.status === 401) {
-        throw new Error('Authentication required. Please log in.');
-      } else {
-        throw new Error(`Server error: ${res.status} ${res.statusText}`);
-      }
+      throw new Error(`Server error: ${res.status} ${res.statusText}`);
     }
 
     const allData = await res.json();
@@ -430,7 +507,6 @@ async function loadUsers(page = 1) {
       throw new Error('Invalid data format received from server');
     }
 
-    // Pagination logic
     const itemsPerPage = paginationState.users.itemsPerPage;
     const totalItems = allData.length;
     const totalPages = Math.ceil(totalItems / itemsPerPage);
@@ -504,10 +580,8 @@ async function updateRole(userId, isAdmin) {
   }
 
   try {
-    const res = await fetch('/api/admin/users/role', {
+    const res = await makeAuthenticatedRequest('/api/admin/users/role', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      credentials: 'include',
       body: JSON.stringify({ userId, isAdmin })
     });
 
@@ -533,9 +607,8 @@ async function deleteUser(userId) {
   }
 
   try {
-    const res = await fetch(`/api/admin/users/${userId}`, {
-      method: 'DELETE',
-      credentials: 'include'
+    const res = await makeAuthenticatedRequest(`/api/admin/users/${userId}`, {
+      method: 'DELETE'
     });
 
     if (!res.ok) {

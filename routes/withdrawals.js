@@ -2,19 +2,18 @@ const express = require('express');
 const router = express.Router();
 const { User, Withdrawal } = require('../models');
 const BalanceService = require('../services/balanceService');
+const { authenticateToken, requireAdmin } = require('../middleware/jwtMiddleware');
+
+// Apply JWT authentication to all routes
+router.use(authenticateToken);
 
 // GET /api/withdrawals/balance - Get user's current balance
 router.get('/balance', async (req, res) => {
   try {
-    // Authentication check
-    if (!req.session || !req.session.userId) {
-      return res.status(401).json({ error: 'Unauthorized' });
-    }
-    
-    console.log('🔍 Getting balance for user:', req.session.userId);
+    console.log('🔍 Getting balance for user:', req.user.userId);
     
     // Use the centralized balance service
-    const balance = await BalanceService.calculateUserBalance(req.session.userId);
+    const balance = await BalanceService.calculateUserBalance(req.user.userId);
     
     console.log('📊 Balance calculated:', balance);
     
@@ -51,13 +50,8 @@ router.get('/balance', async (req, res) => {
 // POST /api/withdrawals - Request withdrawal
 router.post('/', async (req, res) => {
   try {
-    // Authentication check
-    if (!req.session || !req.session.userId) {
-      return res.status(401).json({ error: 'Unauthorized' });
-    }
-    
     console.log('🔍 Withdrawal request received:', {
-      userId: req.session.userId,
+      userId: req.user.userId,
       body: req.body
     });
     
@@ -77,7 +71,7 @@ router.post('/', async (req, res) => {
     }
     
     // Process withdrawal using the centralized service
-    const result = await BalanceService.processWithdrawalRequest(req.session.userId, {
+    const result = await BalanceService.processWithdrawalRequest(req.user.userId, {
       amount: parseFloat(amount),
       bankName: bankName.trim(),
       accountNumber: accountNumber.trim(),
@@ -115,16 +109,11 @@ router.post('/', async (req, res) => {
 // GET /api/withdrawals - Get user's withdrawal history
 router.get('/', async (req, res) => {
   try {
-    // Authentication check
-    if (!req.session || !req.session.userId) {
-      return res.status(401).json({ error: 'Unauthorized' });
-    }
-    
-    console.log('🔍 Getting withdrawal history for user:', req.session.userId);
+    console.log('🔍 Getting withdrawal history for user:', req.user.userId);
     
     // Get user's withdrawals
     const withdrawals = await Withdrawal.findAll({
-      where: { userId: req.session.userId },
+      where: { userId: req.user.userId },
       order: [['createdAt', 'DESC']]
     });
     
@@ -173,29 +162,23 @@ router.get('/', async (req, res) => {
   }
 });
 
-// Admin Routes
+// Admin Routes - Add admin middleware
 
 // GET /api/withdrawals/admin - Get all withdrawal requests (admin only)
-// GET /api/withdrawals/admin - Get all withdrawal requests (admin only)
-router.get('/admin', async (req, res) => {
+router.get('/admin', requireAdmin, async (req, res) => {
   try {
-    // Admin authentication check
-    if (!req.session || !req.session.isAdmin) {
-      return res.status(403).json({ error: 'Admin access required' });
-    }
-    
     console.log('🔍 Admin getting all withdrawal requests');
     
     // Get all withdrawal requests with user info
     const withdrawals = await Withdrawal.findAll({
       include: [{
         model: User,
-        attributes: ['id', 'phone', 'email', 'referralCode']
+        attributes: ['id', 'phone','referralCode']
       }],
       order: [['createdAt', 'DESC']]
     });
     
-    // Format data for admin view (ADD NULL CHECK HERE)
+    // Format data for admin view (with null check)
     const formattedWithdrawals = withdrawals.map(w => ({
       id: w.id,
       amount: w.amount,
@@ -207,15 +190,13 @@ router.get('/admin', async (req, res) => {
       adminNote: w.adminNote,
       createdAt: w.createdAt,
       processedAt: w.processedAt,
-      user: w.User ? {  // 🔥 ADD THIS NULL CHECK
+      user: w.User ? {
         id: w.User.id,
         phone: w.User.phone,
-        email: w.User.email,
         referralCode: w.User.referralCode
-      } : {  // 🔥 FALLBACK FOR DELETED USERS
+      } : {
         id: null,
         phone: 'User Deleted',
-        email: 'User Deleted',
         referralCode: 'N/A'
       }
     }));
@@ -252,13 +233,8 @@ router.get('/admin', async (req, res) => {
 });
 
 // POST /api/withdrawals/admin/process - Process withdrawal request (admin only)
-router.post('/admin/process', async (req, res) => {
+router.post('/admin/process', requireAdmin, async (req, res) => {
   try {
-    // Admin authentication check
-    if (!req.session || !req.session.isAdmin) {
-      return res.status(403).json({ error: 'Admin access required' });
-    }
-    
     console.log('🔍 Admin processing withdrawal:', req.body);
     
     const { withdrawalId, status, adminNote } = req.body;

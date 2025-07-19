@@ -2,7 +2,8 @@ const db = require('../models');
 
 exports.getWithdrawalBalance = async (req, res) => {
   try {
-    const userId = req.session.userId;  // Assuming session holds userId
+    // Use JWT authentication instead of session
+    const userId = req.user?.id;  // Get userId from JWT token
     if (!userId) return res.status(401).json({ error: 'Unauthorized' });
 
     // Fetch user totalReceived

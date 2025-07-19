@@ -2,7 +2,7 @@ const db = require('../models');
 
 exports.requestWithdrawal = async (req, res) => {
   try {
-    const userId = req.session.userId;
+    const userId = req.user?.id;  
     const { amount, bankName, accountNumber } = req.body;
 
     if (!amount || amount <= 0) {

@@ -1,51 +1,93 @@
-const db = require('../models');
+const jwt = require('jsonwebtoken');
+const { User } = require('../models');
 
-exports.isAdminPage = async (req, res, next) => {
+// JWT Authentication Middleware
+const authenticateJWT = async (req, res, next) => {
   try {
-    if (!req.session.userId) {
-      return res.redirect('/login.html');
+    const authHeader = req.headers.authorization;
+    
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+      return res.status(401).json({ error: 'Access token required' });
     }
 
-    const user = await db.User.findByPk(req.session.userId);
-    if (!user || !user.isAdmin) {
-      return res.redirect('/login.html');
+    const token = authHeader.substring(7); // Remove 'Bearer ' prefix
+    
+    // Verify token
+    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    
+    // Optional: Verify user still exists in database
+    const user = await User.findByPk(decoded.id);
+    if (!user) {
+      return res.status(401).json({ error: 'User not found' });
     }
 
-    // 🔥 SET req.session.isAdmin for withdrawal.js compatibility
-    req.session.isAdmin = user.isAdmin;
+    // Add user data to request object
+    req.user = {
+      id: decoded.id,
+      phone: decoded.phone,
+      isAdmin: decoded.isAdmin
+    };
 
     next();
-  } catch (err) {
-    console.error('Auth middleware error:', err);
-    return res.redirect('/login.html');
+  } catch (error) {
+    if (error.name === 'JsonWebTokenError') {
+      return res.status(401).json({ error: 'Invalid token' });
+    } else if (error.name === 'TokenExpiredError') {
+      return res.status(401).json({ error: 'Token expired' });
+    } else {
+      console.error('JWT middleware error:', error);
+      return res.status(500).json({ error: 'Server error' });
+    }
   }
 };
 
-// Add this for API routes (returns JSON instead of redirecting)
-exports.isAdmin = async (req, res, next) => {
+// Admin Authorization Middleware
+const authorizeAdmin = (req, res, next) => {
+  if (!req.user) {
+    return res.status(401).json({ error: 'Authentication required' });
+  }
+  
+  if (!req.user.isAdmin) {
+    return res.status(403).json({ error: 'Admin access required' });
+  }
+  
+  next();
+};
+
+// Optional: Check if user is authenticated (for optional auth routes)
+const optionalAuth = async (req, res, next) => {
   try {
-    if (!req.session.userId) {
-      return res.status(401).json({ error: 'Authentication required' });
+    const authHeader = req.headers.authorization;
+    
+    if (authHeader && authHeader.startsWith('Bearer ')) {
+      const token = authHeader.substring(7);
+      const decoded = jwt.verify(token, process.env.JWT_SECRET);
+      
+      const user = await User.findByPk(decoded.id);
+      if (user) {
+        req.user = {
+          id: decoded.id,
+          phone: decoded.phone,
+          isAdmin: decoded.isAdmin
+        };
+      }
     }
-
-    const user = await db.User.findByPk(req.session.userId);
-    if (!user || !user.isAdmin) {
-      return res.status(403).json({ error: 'Admin access required' });
-    }
-
-    // 🔥 SET req.session.isAdmin for withdrawal.js compatibility
-    req.session.isAdmin = user.isAdmin;
-
+    
     next();
-  } catch (err) {
-    console.error('Auth middleware error:', err);
-    return res.status(500).json({ error: 'Server error' });
+  } catch (error) {
+    // Continue without authentication for optional auth routes
+    next();
   }
-}; // 🔥 FIXED: Added missing closing brace
+};
 
-exports.isAuthenticated = (req, res, next) => {
-  if (req.session && req.session.userId) {
-    return next();
-  }
-  return res.status(401).json({ error: 'Unauthorized: Please log in' });
+// Legacy middleware names for backward compatibility
+const isAuthenticated = authenticateJWT;
+const isAdmin = [authenticateJWT, authorizeAdmin];
+
+module.exports = {
+  authenticateJWT,
+  authorizeAdmin,
+  optionalAuth,
+  isAuthenticated, // backward compatibility
+  isAdmin // backward compatibility
 };

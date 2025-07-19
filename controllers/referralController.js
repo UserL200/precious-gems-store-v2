@@ -1,6 +1,6 @@
 exports.getReferralStats = async (req, res) => {
   try {
-    const userId = req.session.userId;
+    const userId = req.user?.id;  // Get userId from JWT token
     const user = await db.User.findByPk(userId);
     if (!user) return res.status(404).json({ error: 'User not found' });
 

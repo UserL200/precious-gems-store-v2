@@ -1,4 +1,26 @@
-document.addEventListener('DOMContentLoaded', () => {
+// Wait for both DOM and auth.js to be ready
+function waitForAuthManager() {
+  return new Promise((resolve) => {
+    if (window.authManager) {
+      resolve();
+    } else {
+      const checkAuthManager = () => {
+        if (window.authManager) {
+          resolve();
+        } else {
+          setTimeout(checkAuthManager, 10);
+        }
+      };
+      checkAuthManager();
+    }
+  });
+}
+
+// Main initialization
+document.addEventListener('DOMContentLoaded', async () => {
+  // Wait for authManager to be available
+  await waitForAuthManager();
+  
   document.getElementById('authSection').classList.add('hidden');
   document.getElementById('dashboard').classList.add('hidden');
   
@@ -12,6 +34,7 @@ document.addEventListener('DOMContentLoaded', () => {
     </div>
   `;
   document.body.appendChild(loadingDiv);
+  
   // Get inviteCode from URL
   const params = new URLSearchParams(window.location.search);
   const inviteCode = params.get('inviteCode');
@@ -57,10 +80,12 @@ document.addEventListener('DOMContentLoaded', () => {
     referralInput.readOnly = true;
     registerBtn.click(); // Open registration form
   }
+
+  // Initialize authentication check
+  checkAuth();
 });
 
 // Handle switching views
-
 document.getElementById('showRegisterBtn').addEventListener('click', () => {
   document.getElementById('registerForm').classList.remove('hidden');
   document.getElementById('loginForm').classList.add('hidden');
@@ -73,63 +98,203 @@ document.getElementById('showLoginBtn').addEventListener('click', () => {
   document.getElementById('authMsg').innerText = '';
 });
 
-// Register
+// Fixed Login Function for main.js
+document.getElementById('loginBtn').addEventListener('click', async () => {
+  const phone = document.getElementById('logPhone').value;
+  const password = document.getElementById('logPass').value;
+
+  try {
+    const response = await fetch('/api/auth/login', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ phone, password })
+    });
+
+    const data = await response.json();
+    
+    if (response.ok) {
+      // Use authManager to store token consistently
+      window.authManager.storeAuthData(data.token, data.user);
+      console.log('✅ Login successful, token saved');
+      
+      if (data.user.isAdmin) {
+        console.log('🔧 Redirecting to admin dashboard');
+        window.location.href = '/admin';
+      } else {
+        console.log('👤 Loading user dashboard');
+        showDashboard();
+        loadDashboard();
+      }
+    } else {
+      document.getElementById('authMsg').innerText = data.error || 'Login failed';
+    }
+  } catch (error) {
+    console.error('Login error:', error);
+    document.getElementById('authMsg').innerText = 'Login failed';
+  }
+});
+
+// Also fix your register function:
 document.getElementById('registerBtn').addEventListener('click', async () => {
   const phone = document.getElementById('regPhone').value;
   const password = document.getElementById('regPass').value;
   const referralCode = document.getElementById('regRef').value;
 
-  const res = await fetch('/api/auth/register', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ phone, password, referralCode })
-  });
+  try {
+    const response = await fetch('/api/auth/register', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ phone, password, referralCode })
+    });
 
-  const data = await res.json();
-  if (res.ok) {
-    if (data.isAdmin) {
-      window.location.href = '/admin'; // Redirect to admin dashboard
+    const data = await response.json();
+    
+    if (response.ok) {
+      // Use authManager to store token consistently
+      window.authManager.storeAuthData(data.token, data.user);
+      
+      if (data.user.isAdmin) {
+        window.location.href = '/admin';
+      } else {
+        showDashboard();
+        loadDashboard();
+      }
     } else {
-      showDashboard();
-      loadDashboard();
-      // loadProducts(); 
+      document.getElementById('authMsg').innerText = data.error || 'Registration failed';
     }
-  } else {
-    document.getElementById('authMsg').innerText = data.error || 'Registration failed';
+  } catch (error) {
+    console.error('Registration error:', error);
+    document.getElementById('authMsg').innerText = 'Registration failed';
   }
 });
 
-// Login
-document.getElementById('loginBtn').addEventListener('click', async () => {
-  const phone = document.getElementById('logPhone').value;
-  const password = document.getElementById('logPass').value;
-
-  const res = await fetch('/api/auth/login', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ phone, password })
-  });
-
-  const data = await res.json();
-  if (res.ok) {
-    if (data.isAdmin) {
-      window.location.href = '/admin';
-    } else {
-      showDashboard();
-      loadDashboard();
-    }
-  } else {
-    document.getElementById('authMsg').innerText = data.error || 'Login failed';
-  }
-});
-
-// Logout
+// Logout - Updated for JWT
 document.getElementById('logoutBtn').addEventListener('click', async () => {
-  await fetch('/api/auth/logout', { method: 'POST' });
-  window.location.reload();
+  try {
+    // Call logout endpoint with JWT token
+    await window.authenticatedFetch('/api/auth/logout', { method: 'POST' });
+  } catch (error) {// Enhanced JWT Middleware with debugging
+const { verifyToken, extractTokenFromHeader } = require('../utils/jwt');
+
+/**
+ * JWT Authentication Middleware with enhanced debugging
+ */
+const authenticateToken = (req, res, next) => {
+  try {
+    console.log('🔍 Auth middleware - Headers:', {
+      authorization: req.headers['authorization'],
+      'content-type': req.headers['content-type'],
+      'user-agent': req.headers['user-agent']?.substring(0, 50) + '...'
+    });
+    
+    const authHeader = req.headers['authorization'];
+    const token = extractTokenFromHeader(authHeader);
+    
+    console.log('🔍 Auth middleware - Token extracted:', token ? 'Found' : 'Not found');
+    
+    if (!token) {
+      console.log('❌ Auth middleware - No token provided');
+      return res.status(401).json({ 
+        error: 'Access token required',
+        details: 'No authorization header or token found'
+      });
+    }
+    
+    const decoded = verifyToken(token);
+    console.log('🔍 Auth middleware - Token decoded:', {
+      userId: decoded.userId,
+      phone: decoded.phone,
+      isAdmin: decoded.isAdmin
+    });
+    
+    // Attach user info to request object
+    req.user = {
+      userId: decoded.userId,
+      phone: decoded.phone,
+      isAdmin: decoded.isAdmin || false,
+      referralCode: decoded.referralCode
+    };
+    
+    console.log('✅ Auth middleware - User attached to request:', req.user.userId);
+    next();
+    
+  } catch (error) {
+    console.error('💥 JWT authentication error:', error);
+    console.error('💥 Auth middleware - Error details:', {
+      message: error.message,
+      name: error.name,
+      stack: error.stack
+    });
+    
+    return res.status(401).json({ 
+      error: 'Invalid or expired token',
+      details: process.env.NODE_ENV === 'development' ? error.message : undefined
+    });
+  }
+};
+
+/**
+ * Admin Authorization Middleware with better error handling
+ */
+const requireAdmin = (req, res, next) => {
+  console.log('🔍 Admin middleware - Checking user:', req.user);
+  
+  if (!req.user) {
+    console.log('❌ Admin middleware - No user object');
+    return res.status(401).json({ error: 'Authentication required' });
+  }
+  
+  if (!req.user.isAdmin) {
+    console.log('❌ Admin middleware - User not admin:', req.user.userId);
+    return res.status(403).json({ error: 'Admin access required' });
+  }
+  
+  console.log('✅ Admin middleware - Access granted to:', req.user.userId);
+  next();
+};
+
+/**
+ * Optional authentication - doesn't fail if no token
+ */
+const optionalAuth = (req, res, next) => {
+  try {
+    const authHeader = req.headers['authorization'];
+    const token = extractTokenFromHeader(authHeader);
+    
+    if (token) {
+      const decoded = verifyToken(token);
+      req.user = {
+        userId: decoded.userId,
+        phone: decoded.phone,
+        isAdmin: decoded.isAdmin || false,
+        referralCode: decoded.referralCode
+      };
+      console.log('✅ Optional auth - User authenticated:', req.user.userId);
+    } else {
+      console.log('ℹ️ Optional auth - No token provided, continuing without auth');
+    }
+    
+    next();
+  } catch (error) {
+    console.log('ℹ️ Optional auth - Token invalid, continuing without auth:', error.message);
+    next();
+  }
+};
+
+module.exports = {
+  authenticateToken,
+  requireAdmin,
+  optionalAuth
+};
+    console.error('Logout error:', error);
+  } finally {
+    // Clear local auth data regardless of API response
+    window.authManager.clearAuthData();
+    window.location.reload();
+  }
 });
 
-// Show dashboard
+// Show dashboard - Unchanged
 function showDashboard() {
   document.getElementById('authSection').classList.add('hidden');
   document.getElementById('dashboard').classList.remove('hidden');
@@ -140,18 +305,20 @@ function showDashboard() {
   loadProducts();
   loadReferrals();
 }
+
+// Load dashboard - Updated for JWT
 async function loadDashboard() {
   try {
     console.log('📡 Fetching /api/stats...');
 
-    const statsResponse = await fetch('/api/referrals/stats');
+    const statsResponse = await window.authenticatedFetch('/api/referrals/stats');
     const stats = await statsResponse.json();
 
     console.log('📊 Stats response status:', statsResponse.status);
     console.log('📊 Stats response headers:', [...statsResponse.headers.entries()]);
     
     // Fetch balance data  
-    const balanceResponse = await fetch('/api/withdrawals/balance');
+    const balanceResponse = await window.authenticatedFetch('/api/withdrawals/balance');
     const balance = await balanceResponse.json();
     
     // Update dashboard elements
@@ -165,26 +332,39 @@ async function loadDashboard() {
     if (stats.referralCode) {
       const link = `${window.location.origin}?inviteCode=${stats.referralCode}`;
       const referralLinkElem = document.getElementById('referralLink');
-    if (referralLinkElem) {
-      referralLinkElem.innerText = link;
+      if (referralLinkElem) {
+        referralLinkElem.innerText = link;
+      }
     }
-  }
   } catch (error) {
     console.error('Error loading dashboard:', error);
   }
 }
 
-// On page load
-(async function checkAuth() {
+// Authentication check - Updated for JWT
+async function checkAuth() {
   try {
-    const res = await fetch('/api/auth/me');
+    // Check if we have a token
+    if (!window.authManager.isAuthenticated()) {
+      // Remove loading indicator
+      const loadingDiv = document.getElementById('loading');
+      if (loadingDiv) loadingDiv.remove();
+      
+      // Not logged in - show auth section
+      document.getElementById('authSection').classList.remove('hidden');
+      document.getElementById('dashboard').classList.add('hidden');
+      return;
+    }
+
+    // Verify token with server
+    const response = await window.authenticatedFetch('/api/auth/me');
     
     // Remove loading indicator
     const loadingDiv = document.getElementById('loading');
     if (loadingDiv) loadingDiv.remove();
     
-    if (res.ok) {
-      const data = await res.json();
+    if (response.ok) {
+      const data = await response.json();
       if (data.isAdmin) {
         window.location.href = '/admin';
       } else {
@@ -192,12 +372,17 @@ async function loadDashboard() {
         loadDashboard();
       }
     } else {
-      // Not logged in - show auth section
+      // Token invalid - clear auth data and show auth section
+      window.authManager.clearAuthData();
       document.getElementById('authSection').classList.remove('hidden');
       document.getElementById('dashboard').classList.add('hidden');
     }
   } catch (error) {
     console.error('Auth check failed:', error);
+    
+    // Clear auth data on error
+    window.authManager.clearAuthData();
+    
     // Remove loading indicator and show auth section on error
     const loadingDiv = document.getElementById('loading');
     if (loadingDiv) loadingDiv.remove();
@@ -205,54 +390,57 @@ async function loadDashboard() {
     document.getElementById('authSection').classList.remove('hidden');
     document.getElementById('dashboard').classList.add('hidden');
   }
-})();
+}
 
-
-// Cart
+// Cart - All functions updated for JWT
 // Global cart state
 let cart = [];
 let products = []; // Store products data for reference
 
-// Load products and store them globally
+// Load products - Updated for JWT
 async function loadProducts() {
-  const res = await fetch('/api/products');
-  products = await res.json();
-  const list = document.getElementById('productList');
-  list.innerHTML = '';
+  try {
+    const response = await window.authenticatedFetch('/api/products');
+    products = await response.json();
+    const list = document.getElementById('productList');
+    list.innerHTML = '';
 
-  products.forEach(p => {
-    const options = (p.id % 2 === 0)
-      ? [300, 500, 1000, 3800, 6000]
-      : [100, 250, 500, 700, 1000, 2500];
+    products.forEach(p => {
+      const options = (p.id % 2 === 0)
+        ? [300, 500, 1000, 3800, 6000]
+        : [100, 250, 500, 700, 1000, 2500];
 
-    const div = document.createElement('div');
-    div.className = 'product-card';
+      const div = document.createElement('div');
+      div.className = 'product-card';
 
-    div.innerHTML = `
-      <img src="${p.imageUrl}" alt="${p.name}" class="product-image">
-      <div class="product-info">
-        <div class="product-name">${p.name}</div>
-        <div class="product-type">${p.type}</div>
-        <div class="product-price">Choose an investment:</div>
-        <div class="price-options"></div>
-      </div>
-    `;
+      div.innerHTML = `
+        <img src="${p.imageUrl}" alt="${p.name}" class="product-image">
+        <div class="product-info">
+          <div class="product-name">${p.name}</div>
+          <div class="product-type">${p.type}</div>
+          <div class="product-price">Choose an investment:</div>
+          <div class="price-options"></div>
+        </div>
+      `;
 
-    const priceOptionsDiv = div.querySelector('.price-options');
+      const priceOptionsDiv = div.querySelector('.price-options');
 
-    options.forEach(price => {
-      const priceBtn = document.createElement('button');
-      priceBtn.className = 'btn btn-secondary';
-      priceBtn.innerText = `R${price}`;
-      priceBtn.addEventListener('click', () => addToCart(p.id, price, p.name, p.type));
-      priceOptionsDiv.appendChild(priceBtn);
+      options.forEach(price => {
+        const priceBtn = document.createElement('button');
+        priceBtn.className = 'btn btn-secondary';
+        priceBtn.innerText = `R${price}`;
+        priceBtn.addEventListener('click', () => addToCart(p.id, price, p.name, p.type));
+        priceOptionsDiv.appendChild(priceBtn);
+      });
+
+      list.appendChild(div);
     });
-
-    list.appendChild(div);
-  });
+  } catch (error) {
+    console.error('Error loading products:', error);
+  }
 }
 
-// Enhanced addToCart function
+// Enhanced addToCart function - Unchanged
 function addToCart(productId, price, name, type) {
   const existingItem = cart.find(item => item.productId === productId && item.price === price);
   
@@ -272,13 +460,13 @@ function addToCart(productId, price, name, type) {
   showCartAnimation();
 }
 
-// Remove item from cart
+// Remove item from cart - Unchanged
 function removeFromCart(productId, price) {
   cart = cart.filter(item => !(item.productId === productId && item.price === price));
   renderCart();
 }
 
-// Update quantity
+// Update quantity - Unchanged
 function updateQuantity(productId, price, change) {
   const item = cart.find(item => item.productId === productId && item.price === price);
   if (item) {
@@ -291,7 +479,7 @@ function updateQuantity(productId, price, change) {
   }
 }
 
-// Enhanced renderCart function
+// Enhanced renderCart function - Unchanged
 function renderCart() {
   const cartDiv = document.getElementById('cart');
   const checkoutBtn = document.getElementById('checkoutBtn');
@@ -354,7 +542,7 @@ function renderCart() {
   cartDiv.innerHTML = cartHTML;
 }
 
-// Show cart animation when item is added
+// Show cart animation - Unchanged
 function showCartAnimation() {
   const cartDiv = document.getElementById('cart');
   
@@ -370,7 +558,7 @@ function showCartAnimation() {
   showCartNotification('💎 Gem added to your collection!');
 }
 
-// Show cart notifications
+// Show cart notifications - Unchanged
 function showCartNotification(message) {
   // Remove existing notification
   const existingNotification = document.querySelector('.cart-notification');
@@ -406,7 +594,7 @@ function showCartNotification(message) {
   }, 3000);
 }
 
-// Enhanced checkout function
+// Enhanced checkout function - Updated for JWT
 async function checkout() {
   const checkoutBtn = document.getElementById('checkoutBtn');
   const originalText = checkoutBtn.innerHTML;
@@ -415,15 +603,14 @@ async function checkout() {
   checkoutBtn.disabled = true;
 
   try {
-    const res = await fetch('/api/cart/checkout', {
+    const response = await window.authenticatedFetch('/api/cart/checkout', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ items: cart })
     });
 
-    const data = await res.json();
+    const data = await response.json();
 
-    if (res.ok) {
+    if (response.ok) {
       checkoutBtn.innerHTML = '✅ Purchase Successful!';
       checkoutBtn.classList.add('cart-success');
       showCartNotification('🎉 Please complete payment below');
@@ -461,9 +648,7 @@ async function checkout() {
   }
 }
 
-
-
-// Add CSS for notifications
+// Add CSS for notifications - Unchanged
 const notificationCSS = `
   @keyframes slideDown {
     from {
@@ -489,14 +674,15 @@ const style = document.createElement('style');
 style.textContent = notificationCSS;
 document.head.appendChild(style);
 
+// Load withdrawal balance - Updated for JWT
 async function loadWithdrawalBalance() {
   try {
-    const response = await fetch('http://127.0.0.1:3000/api/withdrawals/balance');
+    const response = await window.authenticatedFetch('/api/withdrawals/balance');
     
     if (!response.ok) throw new Error('Failed to fetch balance');
     
-    const data = await response.json(); // ✅ Read once
-    console.log('Withdrawal response:........................', data); // ✅ Use the stored data
+    const data = await response.json();
+    console.log('Withdrawal response:........................', data);
     
     const balanceElem = document.getElementById('withdrawBalance');
     balanceElem.innerText = `R${data.balance.toFixed(2)}`;
@@ -511,63 +697,7 @@ async function loadWithdrawalBalance() {
   }
 }
 
-// document.getElementById('withdrawForm').addEventListener('submit', async (e) => {
-//   e.preventDefault();
-
-//   const amountInput = document.getElementById('withdrawAmount');
-//   const bankInput = document.getElementById('withdrawBank');
-//   const accountInput = document.getElementById('withdrawAccount');
-//   const msgElem = document.getElementById('withdrawMsg');
-
-//   const amount = parseFloat(amountInput.value);
-//   const bankName = bankInput.value.trim();
-//   const accountNumber = accountInput.value.trim();
-
-//   msgElem.style.color = 'red';
-//   msgElem.innerText = '';
-
-//   if (!amount || amount <= 0) {
-//     msgElem.innerText = 'Please enter a valid withdrawal amount.';
-//     return;
-//   }
-
-//   if (!bankName || !accountNumber) {
-//     msgElem.innerText = 'Please provide bank name and account number.';
-//     return;
-//   }
-
-//   // Validate amount <= max allowed
-//   const maxAmount = parseFloat(amountInput.max);
-//   if (amount > maxAmount) {
-//     msgElem.innerText = `You can withdraw up to R${maxAmount.toFixed(2)} only.`;
-//     return;
-//   }
-
-//   try {
-//     const res = await fetch('/api/withdrawals', {
-//       method: 'POST',
-//       headers: { 'Content-Type': 'application/json' },
-//       body: JSON.stringify({ amount, bankName, accountNumber }),
-//     });
-//     const data = await res.json();
-
-//     if (res.ok) {
-//       msgElem.style.color = 'green';
-//       msgElem.innerText = data.message || 'Withdrawal requested successfully!';
-//       amountInput.value = '';
-//       bankInput.value = '';
-//       accountInput.value = '';
-
-//       // Refresh balance to reflect new withdrawal
-//       await loadWithdrawalBalance();
-//     } else {
-//       msgElem.innerText = data.error || 'Failed to request withdrawal.';
-//     }
-//   } catch (err) {
-//     msgElem.innerText = 'Server error. Please try again later.';
-//   }
-// });
-
+// Withdrawal form - Updated for JWT
 document.getElementById('withdrawForm').addEventListener('submit', async (e) => {
   e.preventDefault();
   console.log('🔍 Form submitted');
@@ -608,58 +738,63 @@ document.getElementById('withdrawForm').addEventListener('submit', async (e) => 
   try {
     console.log('🔍 About to send fetch request');
     
-    const res = await fetch('/api/withdrawals', {
+    const response = await window.authenticatedFetch('/api/withdrawals', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ amount, bankName, accountNumber }),
+      body: JSON.stringify({ amount, bankName, accountNumber })
     });
     
-    console.log('🔍 Fetch response:', res.status, res.statusText);
+    console.log('🔍 Fetch response:', response.status, response.statusText);
     
-    const data = await res.json();
+    const data = await response.json();
     console.log('🔍 Response data:', data);
-    
 
-    if (res.ok) {
-          msgElem.style.color = 'green';
-          msgElem.innerText = data.message || 'Withdrawal requested successfully!';
-          amountInput.value = '';
-          bankInput.value = '';
-          accountInput.value = '';
+    if (response.ok) {
+      msgElem.style.color = 'green';
+      msgElem.innerText = data.message || 'Withdrawal requested successfully!';
+      amountInput.value = '';
+      bankInput.value = '';
+      accountInput.value = '';
 
-          // Refresh balance to reflect new withdrawal
-          await loadWithdrawalBalance();  } else {
-      msgElem.innerText = data.error || 'Failed to request withdrawal.';}
-           } catch (err) {
+      // Refresh balance to reflect new withdrawal
+      await loadWithdrawalBalance();
+    } else {
+      msgElem.innerText = data.error || 'Failed to request withdrawal.';
+    }
+  } catch (err) {
     console.error('🔍 Fetch error:', err);
     msgElem.innerText = 'Server error. Please try again later.';
   }
 });
 
+// Load referrals - Updated for JWT
 async function loadReferrals() {
-  const res = await fetch('/api/referrals/stats');
-  const data = await res.json();
-  const tbody = document.getElementById('referralStatsBody');
-  tbody.innerHTML = '';
+  try {
+    const response = await authenticatedFetch('/api/referrals/stats');
+    const data = await response.json();
+    const tbody = document.getElementById('referralStatsBody');
+    tbody.innerHTML = '';
 
-  if (data.referrals && data.referrals.length > 0) {
-    data.referrals.forEach((ref, i) => {
+    if (data.referrals && data.referrals.length > 0) {
+      data.referrals.forEach((ref, i) => {
+        const row = document.createElement('tr');
+        row.innerHTML = `
+          <td>${i + 1}</td>
+          <td>${ref.phone || '-'}</td>
+          <td>${ref.totalPurchases || 0}</td>
+        `;
+        tbody.appendChild(row);
+      });
+    } else {
       const row = document.createElement('tr');
-      row.innerHTML = `
-        <td>${i + 1}</td>
-        <td>${ref.phone || '-'}</td>
-        <td>${ref.totalPurchases || 0}</td>
-      `;
+      row.innerHTML = `<td colspan="4" style="text-align:center;">No referrals yet</td>`;
       tbody.appendChild(row);
-    });
-  } else {
-    const row = document.createElement('tr');
-    row.innerHTML = `<td colspan="4" style="text-align:center;">No referrals yet</td>`;
-    tbody.appendChild(row);
+    }
+  } catch (error) {
+    console.error('Error loading referrals:', error);
   }
 }
 
-
+// Copy referral link - Unchanged
 function copyReferralLink() {
   const link = document.getElementById('referralLink').innerText;
   navigator.clipboard.writeText(link).then(() => {

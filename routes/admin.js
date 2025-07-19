@@ -1,19 +1,25 @@
 const express = require('express');
 const router = express.Router();
 const adminController = require('../controllers/adminController');
-const { isAdmin, isAdminPage } = require('../middleware/authMiddleware'); // ✅
+const { authenticateToken, requireAdmin } = require('../middleware/jwtMiddleware');
 
-/** 🔒 Admin API routes (use isAdmin for JSON response auth checks) */
-router.get('/users', isAdmin, adminController.getAllUsers);
-router.get('/purchases', isAdmin, adminController.getAllPurchases);
-router.get('/withdrawals', isAdmin, adminController.getAllWithdrawals);
-router.post('/user-role', isAdmin, adminController.updateUserRole);
-router.post('/deactivate-user', isAdmin, adminController.deactivateUser);
-router.post('/withdrawals/process', isAdmin, adminController.processWithdrawal); 
-router.get('/purchases/pending', isAdmin, adminController.getPendingPurchases);
-router.post('/purchases/:id/process', isAdmin, adminController.processPurchase);
-router.post('/purchases/:purchaseId/process', isAdmin, adminController.approvePurchase);
+// Apply JWT authentication and admin check to all routes
+router.use(authenticateToken);
+router.use(requireAdmin);
 
+// User management routes
+router.get('/users', adminController.getAllUsers);
+router.post('/users/role', adminController.updateUserRole);  // Fixed: was '/user-role'
+router.delete('/users/:userId', adminController.deleteUser);  // Added: missing delete route
+router.post('/users/deactivate', adminController.deactivateUser);  // Fixed: was '/deactivate-user'
 
+// Purchase management routes
+router.get('/purchases', adminController.getAllPurchases);
+router.get('/purchases/pending', adminController.getPendingPurchases);
+router.post('/purchases/:id/process', adminController.processPurchase);
+
+// Withdrawal management routes
+router.get('/withdrawals', adminController.getAllWithdrawals);
+router.post('/withdrawals/process', adminController.processWithdrawal);  // Fixed: was '/withdrawals/process'
 
 module.exports = router;

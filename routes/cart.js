@@ -1,13 +1,13 @@
 const express = require('express');
 const router = express.Router();
 const { Purchase, Commission, User, Product, sequelize } = require('../models');
+const { authenticateToken } = require('../middleware/jwtMiddleware');
+
+// Apply JWT authentication to all routes
+router.use(authenticateToken);
 
 // Checkout route
 router.post('/checkout', async (req, res) => {
-  if (!req.session.userId) {
-    return res.status(401).json({ error: 'Unauthorized' });
-  }
-
   const { items } = req.body;
   if (!Array.isArray(items) || items.length === 0) {
     return res.status(400).json({ error: 'No items' });
@@ -30,12 +30,12 @@ router.post('/checkout', async (req, res) => {
     }
 
     const purchase = await Purchase.create({
-      userId: req.session.userId,
+      userId: req.user.userId,
       totalAmount: total
     }, { transaction: t });
 
-    // Rest of your code stays the same...
-    const buyer = await User.findByPk(req.session.userId, { transaction: t });
+    // Handle referral commission
+    const buyer = await User.findByPk(req.user.userId, { transaction: t });
     if (buyer.referredBy) {
       const commissionAmount = total * 0.20;
       await Commission.create({
@@ -46,7 +46,11 @@ router.post('/checkout', async (req, res) => {
     }
 
     await t.commit();
-    return res.json({ message: 'Checkout successful', total });
+    return res.json({ 
+      message: 'Checkout successful', 
+      total,
+      purchaseId: purchase.id
+    });
 
   } catch (err) {
     await t.rollback();
@@ -56,4 +60,3 @@ router.post('/checkout', async (req, res) => {
 });
 
 module.exports = router;
-
