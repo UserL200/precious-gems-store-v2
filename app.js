@@ -62,8 +62,11 @@ app.use((req, res, next) => {
   }
 });
 
-// API Routes
-app.use('/api/auth', authRoutes);
+// API Routes with error wrapping
+app.use('/api/auth', (req, res, next) => {
+  console.log(`🔐 Auth route: ${req.method} ${req.path}`);
+  authRoutes(req, res, next);
+});
 app.use('/api/products', productRoutes);
 app.use('/api/cart', cartRoutes);
 app.use('/api/referrals', referralRoutes);
